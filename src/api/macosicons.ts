@@ -1,3 +1,7 @@
+import fs from "fs";
+import os from "os";
+import { chromium } from "playwright-core";
+
 const SEARCH_ENDPOINT = "https://api.macosicons.com/api/v1/search";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
@@ -20,6 +24,87 @@ export interface SearchPayload {
   offset?: number;
   page?: number;
   totalPages?: number;
+}
+
+function getBrowserExecutablePath(): string | null {
+  const configured = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim();
+  if (configured && fs.existsSync(configured)) return configured;
+
+  const candidatesByPlatform: Record<string, string[]> = {
+    win32: [
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      `${process.env.LOCALAPPDATA ?? ""}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      `${process.env.LOCALAPPDATA ?? ""}\\Google\\Chrome\\Application\\chrome.exe`,
+    ],
+    darwin: [
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ],
+    linux: [
+      "/usr/bin/microsoft-edge",
+      "/usr/bin/google-chrome",
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser",
+    ],
+  };
+
+  const candidates = candidatesByPlatform[os.platform()] ?? [];
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) ?? null;
+}
+
+function deriveAppNameFromIcnsUrl(icnsUrl: string, iconId: string): string {
+  const fileName = decodeURIComponent(icnsUrl.split("/").pop() ?? "").replace(/\.icns$/i, "");
+  const suffix = fileName.replace(/^icnsFile_[^_]+_/, "");
+  if (!suffix || suffix === iconId) return `icon-${iconId}`;
+  return suffix.replace(/_/g, " ").trim();
+}
+
+async function resolveIconByIdViaBrowser(iconId: string): Promise<SearchHit | null> {
+  const executablePath = getBrowserExecutablePath();
+  if (!executablePath) {
+    throw new Error(
+      "Could not find a Chromium-based browser. Set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH if needed."
+    );
+  }
+
+  const browser = await chromium.launch({
+    executablePath,
+    headless: false,
+    args: ["--disable-blink-features=AutomationControlled"],
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(`https://macosicons.com/?icon=${encodeURIComponent(iconId)}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
+
+    const downloadLink = page.locator('a[href$=".icns"]');
+    await downloadLink.first().waitFor({ timeout: 30000 });
+
+    const icnsUrl = await downloadLink.first().getAttribute("href");
+    if (!icnsUrl) return null;
+
+    const heading = page.locator("h1, h2").filter({ hasText: /.+/ }).first();
+    const headingText = (await heading.textContent())?.trim();
+    const appName =
+      headingText && headingText !== "macOS App Icons"
+        ? headingText
+        : deriveAppNameFromIcnsUrl(icnsUrl, iconId);
+
+    return {
+      objectID: iconId,
+      appName,
+      icnsUrl,
+    };
+  } finally {
+    await browser.close();
+  }
 }
 
 export async function searchIcons(params: {
@@ -93,28 +178,7 @@ export async function resolveIconById(params: {
     // Fallback to HTML parsing below.
   }
 
-  const pageUrl = `https://macosicons.com/?icon=${encodeURIComponent(iconId)}`;
-  const response = await fetch(pageUrl, {
-    headers: {
-      "User-Agent": "macicon-fetcher/2.0.0",
-    },
-  });
-  if (!response.ok) return null;
-
-  const html = await response.text();
-  const icnsUrlMatch = html.match(/https?:\/\/[^"'\s<>]+\.icns/gi);
-  const icnsUrl = icnsUrlMatch?.[0];
-  if (!icnsUrl) return null;
-
-  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-  const titleText = titleMatch?.[1]?.trim() ?? "";
-  const appName = titleText.split("|")[0]?.trim() || `icon-${iconId}`;
-
-  return {
-    objectID: iconId,
-    appName,
-    icnsUrl,
-  };
+  return resolveIconByIdViaBrowser(iconId);
 }
 
 function sleep(ms: number): Promise<void> {
