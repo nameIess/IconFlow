@@ -5,11 +5,7 @@ import { loadConfig } from "../config.js";
 import { searchIcons } from "../api/macosicons.js";
 import type { SearchPayload } from "../api/macosicons.js";
 import { getSearchFromCache, setSearchCache } from "../cache/search.js";
-
-function toInt(value: unknown, fallback: number): number {
-  const num = Number(value);
-  return Number.isInteger(num) && num > 0 ? num : fallback;
-}
+import { toPositiveInt } from "../utils/number.js";
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -25,8 +21,8 @@ export function registerSearchCommand(program: Command): void {
         console.error(chalk.red("\n✗ API key missing. Set it in .env or global config."));
         process.exit(1);
       }
-      const limit = toInt(opts.limit, cfg.defaultLimit);
-      const page = toInt(opts.page, 1);
+      const limit = toPositiveInt(opts.limit, cfg.defaultLimit);
+      const page = toPositiveInt(opts.page, 1);
       const offset = (page - 1) * limit;
 
       let payload: SearchPayload;
