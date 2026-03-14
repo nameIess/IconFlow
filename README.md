@@ -108,7 +108,6 @@ mac-icns download --links-file ./icons.txt
 ```
 
 Links-file mode is non-interactive by default and processes all valid entries.
-If a `?icon=` page is protected by the site, the CLI may briefly open a local Chromium-based browser to resolve the direct `.icns` download URL.
 
 #### Download And Install In One Step
 
