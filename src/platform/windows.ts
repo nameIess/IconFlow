@@ -3,20 +3,20 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { convertIcnsToIco } from "../convert.js";
 
+async function resolveIconPathForWindows(iconPath: string): Promise<string> {
+  const ext = path.extname(iconPath).toLowerCase();
+  if (ext !== ".icns") return iconPath;
+
+  const icoPath = path.join(path.dirname(iconPath), path.basename(iconPath, ".icns") + ".ico");
+  await convertIcnsToIco(iconPath, icoPath);
+  return icoPath;
+}
+
 export async function installToFolderAsync(params: {
   iconPath: string;
   folderPath: string;
 }): Promise<void> {
-  const ext = path.extname(params.iconPath).toLowerCase();
-  const isIcns = ext === ".icns";
-
-  let icoPath: string;
-  if (isIcns) {
-    icoPath = path.join(path.dirname(params.iconPath), path.basename(params.iconPath, ".icns") + ".ico");
-    await convertIcnsToIco(params.iconPath, icoPath);
-  } else {
-    icoPath = params.iconPath;
-  }
+  const icoPath = await resolveIconPathForWindows(params.iconPath);
 
   const folderPath = params.folderPath;
   if (!fs.existsSync(folderPath)) {
@@ -48,16 +48,7 @@ export async function installToShortcut(params: {
   iconPath: string;
   shortcutPath: string;
 }): Promise<void> {
-  const ext = path.extname(params.iconPath).toLowerCase();
-  const isIcns = ext === ".icns";
-
-  let icoPath: string;
-  if (isIcns) {
-    icoPath = path.join(path.dirname(params.iconPath), path.basename(params.iconPath, ".icns") + ".ico");
-    await convertIcnsToIco(params.iconPath, icoPath);
-  } else {
-    icoPath = params.iconPath;
-  }
+  const icoPath = await resolveIconPathForWindows(params.iconPath);
 
   const { execSync } = await import("child_process");
   const { writeFileSync, unlinkSync } = await import("fs");
