@@ -1,44 +1,19 @@
 {
-  "name": "macicon-fetcher",
+  "name": "iconflow",
   "version": "2.0.0",
-  "description": "Search and download icons from macosicons.com API",
-  "type": "commonjs",
-  "main": "dist/index.js",
-  "bin": {
-    "mac-icns": "dist/index.js"
-  },
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "description": "IconFlow — One-click macOS icon downloader with GUI",
+  "main": "backend/src/server.js",
   "scripts": {
-    "build": "tsc",
-    "prepack": "npm run build",
-    "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
-    "search": "tsx src/index.ts search",
-    "download": "tsx src/index.ts download",
-    "install:icons": "tsx src/index.ts install",
-    "config": "tsx src/index.ts config",
-    "help": "tsx src/index.ts help"
+    "start": "node backend/src/server.js",
+    "dev": "node backend/src/server.js"
   },
   "engines": {
     "node": ">=18"
   },
   "license": "MIT",
   "dependencies": {
-    "@clack/prompts": "^0.7.0",
     "@fiahfy/icns": "^0.0.7",
-    "chalk": "^5.3.0",
-    "commander": "^12.1.0",
-    "env-paths": "^4.0.0",
     "sharp": "^0.33.5",
-    "sharp-ico": "^0.1.5",
-    "sql.js": "^1.11.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.0"
+    "sharp-ico": "^0.1.5"
   }
 }
