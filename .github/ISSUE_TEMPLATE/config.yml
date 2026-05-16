@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Community Support
+    url: https://discord.gg/YOUR_INVITE
+    about: Please ask questions and get help from the community here.
+  - name: Documentation
+    url: https://github.com/nameIess/IconFlow/blob/main/README.md
+    about: Read our documentation to find answers to common questions.
