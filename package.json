@@ -2,10 +2,10 @@
   "name": "iconflow",
   "version": "2.0.0",
   "description": "IconFlow — One-click macOS icon downloader with GUI",
-  "main": "backend/src/server.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node backend/src/server.js",
-    "dev": "node backend/src/server.js"
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
   },
   "engines": {
     "node": ">=18"

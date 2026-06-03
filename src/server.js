@@ -7,7 +7,7 @@ const { routeRequest } = require("./routes/api");
 const { serveStatic } = require("./utils/http");
 
 const CONFIG = loadConfig();
-const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "frontend", "public");
+const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
 const server = http.createServer(async (req, res) => {
   // Try API routes first
