@@ -31,7 +31,7 @@ if not exist "node_modules" (
 echo.
 echo  Starting IconFlow...
 echo.
-node backend\src\server.js
+node src\server.js
 if errorlevel 1 (
   echo.
   echo  [ERROR] Server exited with an error.
