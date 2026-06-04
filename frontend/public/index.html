@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="IconFlow — One-click macOS icon downloader with instant search, batch download, and Windows folder icon support.">
+  <title>IconFlow — macOS Icon Downloader</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%233b82f6'/><text x='50' y='68' text-anchor='middle' font-size='52' fill='white' font-family='sans-serif' font-weight='bold'>IF</text></svg>">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header" id="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12-8.58 3.91a2 2 0 0 1-1.66 0L2 12"/><path d="m22 17-8.58 3.91a2 2 0 0 1-1.66 0L2 17"/></svg>
+        </div>
+        <h1>Icon<span>Flow</span></h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" onclick="openFolder()" title="Open download folder">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          Open Folder
+        </button>
+        <button class="btn btn-ghost" onclick="openSettings()" title="Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Search -->
+    <section class="search-section" id="searchSection">
+      <div class="search-bar">
+        <span class="search-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="text" id="searchInput" placeholder="Search macOS icons... (e.g. Safari, Finder, Spotify)" autofocus>
+        <button class="btn btn-primary" id="searchBtn" onclick="doSearch()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          Search
+        </button>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <span class="control-label">Format</span>
+          <select class="select" id="formatSelect">
+            <option value="auto">Auto (ICO on Win, ICNS on Mac)</option>
+            <option value="icns">ICNS only</option>
+            <option value="ico">ICO only</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <span class="control-label">Results</span>
+          <select class="select" id="limitSelect">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="downloadAll()" id="downloadAllBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+          Download All
+        </button>
+        <span class="result-count" id="resultInfo"></span>
+      </div>
+    </section>
+
+    <!-- Icon Grid -->
+    <div class="icon-grid" id="iconGrid">
+      <div class="state-container">
+        <div class="state-icon accent-bg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 12-8.58 3.91a2 2 0 0 1-1.66 0L2 12"/><path d="m22 17-8.58 3.91a2 2 0 0 1-1.66 0L2 17"/></svg>
+        </div>
+        <h3 class="state-title">Welcome to IconFlow</h3>
+        <p class="state-desc">Search for any macOS app icon and download it with one click. Choose your preferred format above.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toasts"></div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+      <div class="modal-header">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        Settings
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgApiKey">API Key</label>
+        <input class="field-input" type="password" id="cfgApiKey" placeholder="macosicons.com API key">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgHost">Server Host</label>
+        <input class="field-input mono" type="text" id="cfgHost" placeholder="127.0.0.1">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgPort">Server Port</label>
+        <input class="field-input" type="number" id="cfgPort" min="1" max="65535" value="3456">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgDownloadDir">Download Directory (ICNS)</label>
+        <input class="field-input mono" type="text" id="cfgDownloadDir" placeholder="%USERPROFILE%\Downloads\icons\icns">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgDownloadDirIco">Download Directory (ICO)</label>
+        <input class="field-input mono" type="text" id="cfgDownloadDirIco" placeholder="%USERPROFILE%\Downloads\icons\ico">
+      </div>
+      <div class="field">
+        <label class="field-label" for="cfgLimit">Default Result Limit</label>
+        <input class="field-input" type="number" id="cfgLimit" min="1" max="100" value="25">
+      </div>
+      <div class="switch-row">
+        <label class="switch-label" for="cfgDeleteIcns">Delete .icns after converting to .ico</label>
+        <label class="switch">
+          <input type="checkbox" id="cfgDeleteIcns">
+          <span class="switch-track"></span>
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
