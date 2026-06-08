@@ -22,11 +22,15 @@ function readDotEnv(fp) {
   return env;
 }
 
+// Default API key — lets the app search out-of-the-box. Override anytime in Settings or .env.
+const DEFAULT_API_KEY = "09690dca4bdee55f3868c24b7696989c95545f7e9eb39873a29bdf0b1144f4b3";
+
 function loadConfig() {
-  const envPath = path.resolve(__dirname, "..", "..", "..", ".env");
+  const envPath = path.resolve(__dirname, "..", "..", ".env");
   const localEnv = readDotEnv(envPath);
 
-  const apiKey = process.env.MACOSICONS_API_KEY || localEnv.MACOSICONS_API_KEY || "";
+  const apiKey =
+    process.env.MACOSICONS_API_KEY || localEnv.MACOSICONS_API_KEY || DEFAULT_API_KEY;
   const host = process.env.HOST || localEnv.HOST || "127.0.0.1";
   const port = parseInt(process.env.PORT || localEnv.PORT || "3456", 10) || 3456;
 
@@ -50,7 +54,7 @@ function loadConfig() {
 }
 
 function saveConfig(updates) {
-  const envPath = path.resolve(__dirname, "..", "..", "..", ".env");
+  const envPath = path.resolve(__dirname, "..", "..", ".env");
   const existing = readDotEnv(envPath);
   const merged = { ...existing, ...updates };
 

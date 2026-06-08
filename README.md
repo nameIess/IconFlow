@@ -33,7 +33,7 @@ The app opens automatically in your browser at `http://127.0.0.1:3456`.
 
 ## Configuration
 
-Click **Settings** in the top-right corner of the app, or edit `.env` directly:
+A working macosicons.com API key ships with the app, so **search works immediately** with no setup. To use your own key or change defaults, click **Settings** in the top-right corner of the app, or edit `.env` directly:
 
 ```env
 MACOSICONS_API_KEY=your_key_here
