@@ -82,6 +82,37 @@ async function doSearch() {
   }
 }
 
+// Build an ordered list of browser-displayable PNG preview URLs for a hit.
+// Order: low-res PNG, then the iOS PNG. The .icns URL is intentionally excluded
+// (browsers cannot render .icns in an <img>).
+function previewCandidates(hit) {
+  const urls = [];
+  for (const u of [hit.lowResPngUrl, hit.iOSUrl]) {
+    if (u && !urls.includes(u)) urls.push(u);
+  }
+  return urls;
+}
+
+// onerror handler: advance to the next candidate, or show a placeholder.
+function nextPreview(img) {
+  let cands = [];
+  try { cands = JSON.parse(decodeURIComponent(img.dataset.cands || "[]")); } catch {}
+  const idx = parseInt(img.dataset.idx || "0", 10) + 1;
+  if (idx < cands.length) {
+    img.dataset.idx = String(idx);
+    img.src = cands[idx];
+    return;
+  }
+  const wrap = img.parentElement;
+  img.remove();
+  if (wrap && !wrap.querySelector(".icon-placeholder")) {
+    const ph = document.createElement("div");
+    ph.className = "icon-placeholder";
+    ph.innerHTML = ICONS.box;
+    wrap.insertBefore(ph, wrap.firstChild);
+  }
+}
+
 function renderGrid(hits) {
   const grid = document.getElementById("iconGrid");
   grid.innerHTML = "";
@@ -90,14 +121,19 @@ function renderGrid(hits) {
     card.className = "icon-card";
     card.style.animationDelay = `${i * 30}ms`;
     const name = hit.appName || "Unnamed";
-    const author = hit.usersName || "Unknown";
+    const author = hit.usersName || hit.credit || "Unknown";
     const dl = typeof hit.downloads === "number" ? hit.downloads.toLocaleString() : "0";
     const hasUrl = !!hit.icnsUrl;
-    const imgSrc = hit.lowResPngUrl || hit.icnsUrl || "";
+    // Only PNG sources are browser-displayable (.icns cannot render in <img>).
+    // Try each candidate in order before falling back to a placeholder.
+    const candidates = previewCandidates(hit);
+    const candAttr = encodeURIComponent(JSON.stringify(candidates));
 
     card.innerHTML = `
       <div class="icon-preview">
-        ${imgSrc ? `<img src="${imgSrc}" alt="${name}" loading="lazy" onerror="this.style.display='none'">` : `<div class="icon-placeholder">${ICONS.box}</div>`}
+        ${candidates.length
+          ? `<img src="${candidates[0]}" alt="${name}" loading="lazy" data-cands="${candAttr}" data-idx="0" onerror="nextPreview(this)">`
+          : `<div class="icon-placeholder">${ICONS.box}</div>`}
         ${hasUrl ? `<div class="download-overlay"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();downloadOne(${i})">${ICONS.download} Download</button></div>` : ""}
       </div>
       <div class="icon-info">

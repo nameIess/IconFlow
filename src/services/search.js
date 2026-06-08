@@ -32,11 +32,17 @@ function fixHitUrls(hit) {
 }
 
 async function searchIcons(query, limit, page, apiKey) {
-  const offset = (Math.max(1, page) - 1) * limit;
   const res = await fetchWithTimeout(SEARCH_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-    body: JSON.stringify({ query, limit, offset }),
+    body: JSON.stringify({
+      query,
+      searchOptions: {
+        hitsPerPage: limit,
+        page: Math.max(1, page),
+        sort: ["downloads:desc"],
+      },
+    }),
   });
   const data = await res.json();
 
