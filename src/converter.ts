@@ -5,12 +5,24 @@ function isPng(bytes: Uint8Array, offset: number): boolean {
 }
 
 function typeSize(type: string): number {
-  const sizes: Record<string, number> = { ic07: 128, ic08: 256, ic09: 512, ic10: 1024, ic11: 32, ic12: 64, ic13: 256, ic14: 512 };
+  const sizes: Record<string, number> = { icp4: 16, icp5: 32, icp6: 64, ic07: 128, ic08: 256, ic09: 512, ic10: 1024, ic11: 32, ic12: 64, ic13: 256, ic14: 512 };
   return sizes[type] || 0;
 }
 
 function readType(view: DataView, offset: number): string {
   return String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
+}
+
+function blobBytes(bytes: Uint8Array): ArrayBuffer {
+  return bytes.slice().buffer as ArrayBuffer;
+}
+
+function pngDimensions(png: Uint8Array): number {
+  if (png.length < 24) return 1024;
+  const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+  const width = view.getUint32(16);
+  const height = view.getUint32(20);
+  return Math.max(1, Math.min(1024, Math.max(width, height)));
 }
 
 export function extractBestPng(buffer: ArrayBuffer): Uint8Array {
@@ -45,7 +57,7 @@ export function extractBestPng(buffer: ArrayBuffer): Uint8Array {
 }
 
 async function imageFromPng(png: Uint8Array): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+  const url = URL.createObjectURL(new Blob([blobBytes(png)], { type: "image/png" }));
   try {
     const image = new Image();
     image.src = url;
@@ -74,7 +86,8 @@ async function renderPng(source: Uint8Array, size: number): Promise<Uint8Array> 
 }
 
 export async function icnsToPng(buffer: ArrayBuffer): Promise<Blob> {
-  return new Blob([await renderPng(extractBestPng(buffer), 1024)], { type: "image/png" });
+  const source = extractBestPng(buffer);
+  return new Blob([blobBytes(await renderPng(source, pngDimensions(source)))], { type: "image/png" });
 }
 
 export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
@@ -111,7 +124,7 @@ export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
 }
 
 export async function previewUrl(buffer: ArrayBuffer): Promise<string> {
-  return URL.createObjectURL(new Blob([extractBestPng(buffer)], { type: "image/png" }));
+  return URL.createObjectURL(new Blob([blobBytes(extractBestPng(buffer))], { type: "image/png" }));
 }
 
 export function download(blob: Blob, name: string): void {
