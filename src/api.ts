@@ -48,7 +48,12 @@ async function request(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
-export async function searchIcons(key: string, query: string, limit = 24): Promise<SearchResponse> {
+export async function searchIcons(
+  key: string,
+  query: string,
+  limit = 24,
+  page = 1,
+): Promise<SearchResponse> {
   const normalizedKey = key.trim();
   const normalizedQuery = query.trim();
 
@@ -56,10 +61,17 @@ export async function searchIcons(key: string, query: string, limit = 24): Promi
   if (!normalizedQuery) throw new Error("Enter an app name to search.");
   if (normalizedQuery.length > 100) throw new Error("Search must be 100 characters or fewer.");
 
+  const normalizedLimit = Math.min(Math.max(limit, 1), 50);
+  const normalizedPage = Math.max(1, Math.floor(page));
+
   const response = await request("/search", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": normalizedKey },
-    body: JSON.stringify({ query: normalizedQuery, limit: Math.min(Math.max(limit, 1), 50), page: 1 }),
+    body: JSON.stringify({
+      query: normalizedQuery,
+      limit: normalizedLimit,
+      page: normalizedPage,
+    }),
   });
 
   const data = await readResponse(response) as Partial<SearchResponse> & { error?: string; message?: string } | null;
@@ -114,5 +126,5 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
 }
 
 export async function testApiKey(key: string): Promise<void> {
-  await searchIcons(key, "Safari", 1);
+  await searchIcons(key, "Safari", 1, 1);
 }
