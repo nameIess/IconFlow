@@ -1,17 +1,9 @@
 node_modules/
+dist/
 .env
-
-# OS files
+.env.*
+!.env.example
 .DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# IDE
 .vscode/
 .idea/
-
-# Temporary
-*.tmp
-*.temp
+*.log
