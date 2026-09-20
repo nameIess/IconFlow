@@ -45,6 +45,7 @@ function App() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState("");
   const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
   const searchRequestId = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
@@ -106,13 +107,16 @@ function App() {
 
   async function loadMore() {
     const value = activeQuery.trim();
+    const hasMoreResults = total > 0 ? results.length < total : currentPage < totalPages;
+
     if (
       loading ||
       loadingMore ||
+      !!loadMoreError ||
       !apiKey ||
       !value ||
       currentPage < 1 ||
-      currentPage >= totalPages
+      !hasMoreResults
     ) {
       return;
     }
@@ -120,10 +124,12 @@ function App() {
     const nextPage = currentPage + 1;
     const requestId = searchRequestId.current;
     setLoadingMore(true);
+    setLoadMoreError("");
 
     try {
       const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, nextPage);
       if (requestId !== searchRequestId.current) return;
+
       setResults((previous) => {
         const seen = new Set(
           previous.map((hit) => hit.objectID || hit.icnsUrl || hit.appName),
@@ -136,12 +142,15 @@ function App() {
         });
         return [...previous, ...additions];
       });
+
       setCurrentPage(data.page || nextPage);
       setTotalPages(data.totalPages || totalPages);
       setTotal(data.totalHits || total);
     } catch (error) {
       if (requestId === searchRequestId.current) {
-        setToast(error instanceof Error ? error.message : "Unable to load more icons.");
+        const message = error instanceof Error ? error.message : "Unable to load more icons.";
+        setLoadMoreError(message);
+        setToast(message);
       }
     } finally {
       if (requestId === searchRequestId.current) {
@@ -374,7 +383,11 @@ function App() {
                   <LoaderCircle className="spin" size={17} />
                   Loading more icons…
                 </>
-              ) : currentPage >= totalPages ? (
+              ) : loadMoreError ? (
+                <button className="secondary-button" onClick={() => { setLoadMoreError(""); void loadMore(); }}>
+                  Try loading more
+                </button>
+              ) : total > 0 && results.length >= total ? (
                 <>You’ve reached the end of the results.</>
               ) : null}
             </div>
