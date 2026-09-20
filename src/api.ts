@@ -176,6 +176,3 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
   }
 }
 
-export async function testApiKey(key: string): Promise<void> {
-  await searchIcons(key, "Safari", 1, 1);
-}
