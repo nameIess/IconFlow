@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, testApiKey, type IconHit } from "./api";
+import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -179,14 +179,13 @@ function App() {
 
     setTesting(true);
     try {
-      await testApiKey(value);
       localStorage.setItem(KEY, value);
       clearSearchCache();
       setApiKeyState(value);
       setSettingsOpen(false);
-      setToast("API key verified and saved locally.");
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : "API key verification failed.");
+      setToast("API key saved locally. It will be validated on your next search.");
+    } catch {
+      setToast("Unable to save the API key in this browser.");
     } finally {
       setTesting(false);
     }
@@ -424,7 +423,7 @@ function App() {
               <button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button>
               <button className="primary-button" onClick={saveKey} disabled={testing || !draftKey.trim()}>
                 {testing ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
-                {testing ? "Verifying…" : "Verify & Save"}
+                {testing ? "Saving…" : "Save API Key"}
               </button>
             </div>
 
