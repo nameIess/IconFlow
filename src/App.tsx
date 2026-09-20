@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { fetchIcns, searchIcons, SEARCH_PAGE_SIZE, testApiKey, type IconHit } from "./api";
+import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, testApiKey, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -171,6 +171,7 @@ function App() {
     const value = draftKey.trim();
     if (!value) {
       localStorage.removeItem(KEY);
+      clearSearchCache();
       setApiKeyState("");
       setSettingsOpen(false);
       return;
@@ -180,6 +181,7 @@ function App() {
     try {
       await testApiKey(value);
       localStorage.setItem(KEY, value);
+      clearSearchCache();
       setApiKeyState(value);
       setSettingsOpen(false);
       setToast("API key verified and saved locally.");
@@ -192,6 +194,7 @@ function App() {
 
   function removeKey() {
     localStorage.removeItem(KEY);
+    clearSearchCache();
     setApiKeyState("");
     setDraftKey("");
     setSettingsOpen(true);
