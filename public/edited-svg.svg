@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 420" width="100%" height="100%">
+  
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&amp;family=Plus+Jakarta+Sans:wght@700;800;900&amp;family=JetBrains+Mono:wght@700&amp;display=swap');
+    </style>
+    <!-- Primary Flow Gradient -->
+    <linearGradient id="primaryFlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <!-- GPT Accent Gradient -->
+    <linearGradient id="gptAccentGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+
+    <!-- Flare Sparkle Gradient -->
+    <linearGradient id="flareGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#EC4899" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="vectorShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#06B6D4" flood-opacity="0.3" />
+    </filter>
+
+    <!-- Soft Ambient Glow Aura -->
+    <filter id="ambientGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="35" />
+    </filter>
+  </defs>
+  <g id="iconflow-mark-only">
+    
+    <g id="symbol-quantum-flow">
+      <!-- Background Ambient Glow -->
+      <path d="M 170 140 C 230 70, 330 70, 380 140 C 430 210, 370 310, 280 310 C 190 310, 130 220, 180 150 Z" 
+            fill="#06B6D4" filter="url(#ambientGlow)" opacity="0.21" />
+
+      <!-- Back Stream Loop (Letter I & F Weave) -->
+      <path d="M 180 280 C 130 200, 160 110, 250 110 C 330 110, 380 170, 350 250 C 320 320, 220 340, 180 280 Z" 
+            fill="none" stroke="url(#gptAccentGrad)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" filter="url(#vectorShadow)" />
+      
+      <!-- Main Flow Ribbon Front Layer -->
+      <path d="M 150 150 C 210 80, 320 80, 370 150 C 420 220, 350 310, 270 310 C 210 310, 190 270, 220 220 C 250 170, 320 180, 340 230" 
+            fill="none" stroke="url(#primaryFlowGrad)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" filter="url(#vectorShadow)" />
+
+      <!-- Flow Arrow Head (Vector Directivity) -->
+      <path d="M 325 245 L 355 235 L 345 265 Z" fill="#FFFFFF" />
+
+      
+    <g transform="translate(370, 110) scale(1.1)">
+      <path d="M 0 -22 Q 0 0 22 0 Q 0 0 0 22 Q 0 0 -22 0 Q 0 0 0 -22 Z" fill="url(#flareGrad)" filter="url(#vectorShadow)" />
+      <circle cx="0" cy="0" r="4" fill="#FFFFFF" />
+    </g>
+      
+    <g transform="translate(160, 290) scale(0.75)">
+      <path d="M 0 -22 Q 0 0 22 0 Q 0 0 0 22 Q 0 0 -22 0 Q 0 0 0 -22 Z" fill="url(#flareGrad)" filter="url(#vectorShadow)" />
+      <circle cx="0" cy="0" r="4" fill="#FFFFFF" />
+    </g>
+      
+    <g id="vector-control-nodes" opacity="0.85">
+      <!-- Node Guides & Handle Lines -->
+      <line x1="160" y1="130" x2="200" y2="100" stroke="#10B981" stroke-width="1.5" stroke-dasharray="3 3" />
+      <circle cx="200" cy="100" r="4" fill="#10B981" />
+      <rect x="155" y="125" width="10" height="10" fill="#FFFFFF" stroke="#06B6D4" stroke-width="2" rx="2" />
+      
+      <line x1="330" y1="150" x2="370" y2="120" stroke="#10B981" stroke-width="1.5" stroke-dasharray="3 3" />
+      <circle cx="370" cy="120" r="4" fill="#10B981" />
+      <rect x="325" y="145" width="10" height="10" fill="#FFFFFF" stroke="#3B82F6" stroke-width="2" rx="2" />
+
+      <rect x="235" y="275" width="10" height="10" fill="#FFFFFF" stroke="#10B981" stroke-width="2" rx="2" />
+    </g>
+    </g>
+  </g>
+</svg>
