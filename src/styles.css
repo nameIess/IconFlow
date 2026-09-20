@@ -74,7 +74,7 @@ a { color: inherit; }
   color: var(--text);
   border: 0;
   background: transparent;
-  font-family: Manrope, sans-serif;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
   font-weight: 800;
   font-size: 17px;
 }
@@ -97,7 +97,7 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .hero { padding: 108px 0 74px; text-align: center; }
 .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-bottom: 20px; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #69d68b; box-shadow: 0 0 14px #69d68b; }
-.hero h1 { margin: 0; font-family: Manrope, sans-serif; font-size: clamp(46px, 7vw, 84px); line-height: .98; letter-spacing: -.065em; }
+.hero h1 { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; font-size: clamp(46px, 7vw, 84px); line-height: .98; letter-spacing: -.065em; }
 .hero h1 span { color: transparent; background: linear-gradient(120deg, var(--accent), #c8a5ff); background-clip: text; }
 .hero p { max-width: 650px; margin: 25px auto 31px; color: var(--muted); line-height: 1.7; font-size: 16px; }
 
@@ -115,7 +115,7 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .results-section { padding-bottom: 80px; }
 .results-header { display: flex; justify-content: space-between; align-items: end; margin-bottom: 18px; }
 .section-kicker { display: block; text-transform: uppercase; letter-spacing: .13em; color: var(--muted-2); font-size: 10px; font-weight: 700; margin-bottom: 5px; }
-.results-header h2, .settings-modal h2, .preview-modal h2 { margin: 0; font-family: Manrope, sans-serif; font-size: 25px; letter-spacing: -.03em; }
+.results-header h2, .settings-modal h2, .preview-modal h2 { margin: 0; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; font-size: 25px; letter-spacing: -.03em; }
 .result-count { color: var(--muted); font-size: 12px; }
 
 .icon-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; }
@@ -146,7 +146,7 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 
 .empty-state { border-radius: 24px; min-height: 300px; display: grid; place-items: center; align-content: center; text-align: center; padding: 50px 20px; }
 .empty-icon { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px; color: var(--accent); background: rgba(111,153,255,.12); margin-bottom: 15px; }
-.empty-state h3 { margin: 0 0 8px; font-family: Manrope, sans-serif; font-size: 19px; }
+.empty-state h3 { margin: 0 0 8px; font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; font-size: 19px; }
 .empty-state p { max-width: 520px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .suggestions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
 .suggestions button { border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--muted); border-radius: 999px; padding: 7px 12px; font-size: 11px; }
