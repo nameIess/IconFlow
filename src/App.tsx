@@ -164,7 +164,9 @@ function App() {
 
       <header className="topbar glass">
         <button className="brand" onClick={() => { setQuery(""); setResults([]); setTotal(0); }}>
-          <span className="brand-mark"><Sparkles size={17} /></span>
+          <span className="brand-mark">
+            <img src="/favicon.svg" alt="" aria-hidden="true" />
+          </span>
           <span>IconFlow</span>
         </button>
 
