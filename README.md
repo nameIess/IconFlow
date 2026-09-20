@@ -1,78 +1,64 @@
 # IconFlow
 
-One-click macOS icon downloader with a clean, modern web GUI. Search any macOS app icon from [macosicons.com](https://macosicons.com), preview it, and download instantly — in `.icns` or `.ico` format.
+IconFlow is a browser-first macOS icon finder rebuilt from scratch for Vercel.
 
-## Features
+## What changed
 
-- **One-Click Downloads** — Search and download instantly
-- **Batch Downloads** — Download all search results at once
-- **Format Control** — Choose between Auto, ICNS, or ICO
-- **Auto Conversion** — Converts `.icns` → `.ico` automatically on Windows
-- **Apply to System** — Install icons to Windows folders or shortcuts
-- **Configurable** — API key, download dirs, host/port — all from the Settings panel
-- **Premium UI** — Geist-inspired dark theme, responsive, production-ready
+The web version does not use the original Node server or its filesystem/Windows integration. The application is a new React + TypeScript implementation.
 
-## Requirements
+### Client-only API key
 
-- [Node.js](https://nodejs.org) v18+
+Each user supplies their own macOSicons API key. The key is stored in that user's browser under localStorage and is attached directly to macOSicons API requests.
 
-## Quick Start
+IconFlow does not:
+- put a shared API key in source code
+- store user keys in Vercel environment variables
+- send user keys to an IconFlow backend
+- store user keys in a database
 
-```
-start.bat
-```
+macOSicons' current API terms explicitly recommend that distributed apps have each user obtain their own API key rather than embedding a shared key.
 
-Or manually:
+## Icon pipeline
 
-```bash
-npm install
-npm start
-```
+Search results can use the API preview URL for a lightweight grid. When a user previews or downloads an icon, IconFlow fetches the original high-resolution ICNS asset in the browser.
 
-The app opens automatically in your browser at `http://127.0.0.1:3456`.
+The browser then:
+- extracts the largest PNG-backed ICNS representation it can decode
+- generates a 1024px PNG locally
+- generates a multi-size ICO containing 16, 24, 32, 48, 64, 128 and 256px PNG entries
+- downloads the result directly to the user's device
 
-## Configuration
+No conversion request is sent to an IconFlow server.
 
-A working macosicons.com API key ships with the app, so **search works immediately** with no setup. To use your own key or change defaults, click **Settings** in the top-right corner of the app, or edit `.env` directly:
+## Development
 
-```env
-MACOSICONS_API_KEY=your_key_here
+    npm install
+    npm run dev
 
-# Server bind address (change to 0.0.0.0 for LAN access)
-HOST=127.0.0.1
-PORT=3456
+Production verification:
 
-DOWNLOAD_DIR=%USERPROFILE%\Downloads\icons\icns
-DOWNLOAD_DIR_ICO=%USERPROFILE%\Downloads\icons\ico
-DEFAULT_LIMIT=25
-DELETE_ICNS_AFTER_CONVERT=true
-```
+    npm run typecheck
+    npm run build
 
-## Project Structure
+## Vercel
 
-```
-├── src/
-│   ├── server.js          # HTTP server entry point
-│   ├── config/             # .env loader & config
-│   ├── controllers/        # Request handlers
-│   ├── routes/             # API route definitions
-│   ├── services/           # Business logic
-│   │   ├── search.js       #   macosicons.com API
-│   │   ├── download.js     #   Download & convert
-│   │   └── install.js      #   OS icon install
-│   └── utils/              # HTTP helpers
-├── public/
-│   ├── index.html          # Single-page UI
-│   ├── style.css           # Geist-inspired design system
-│   └── app.js              # Frontend logic
-├── .env                        # Configuration
-├── package.json
-├── start.bat                   # Windows launcher
-└── README.md
-```
+Import the repository into Vercel and use:
 
-## Tech Stack
+- Framework preset: Vite
+- Build command: npm run build
+- Output directory: dist
 
-- **Backend**: Node.js (native `http` module — zero framework dependencies)
-- **Frontend**: Vanilla HTML, CSS, JavaScript
-- **Conversion**: `sharp` + `sharp-ico` + `@fiahfy/icns`
+No application environment variables are required for the API key.
+
+## Attribution
+
+IconFlow preserves the creator information returned by macOSicons and links back to macOSicons where appropriate.
+
+macOSicons:
+https://macosicons.com
+
+API documentation:
+https://macosicons.com/developers
+
+API terms:
+https://macosicons.com/developers/terms

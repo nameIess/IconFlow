@@ -1,0 +1,131 @@
+const PNG = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function isPng(bytes: Uint8Array, offset: number): boolean {
+  return PNG.every((value, index) => bytes[offset + index] === value);
+}
+
+function typeSize(type: string): number {
+  const sizes: Record<string, number> = { ic07: 128, ic08: 256, ic09: 512, ic10: 1024, ic11: 32, ic12: 64, ic13: 256, ic14: 512 };
+  return sizes[type] || 0;
+}
+
+function readType(view: DataView, offset: number): string {
+  return String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
+}
+
+export function extractBestPng(buffer: ArrayBuffer): Uint8Array {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 8 || new TextDecoder().decode(bytes.subarray(0, 4)) !== "icns") {
+    throw new Error("The downloaded file is not a valid ICNS file.");
+  }
+
+  const view = new DataView(buffer);
+  const candidates: { size: number; data: Uint8Array }[] = [];
+  let offset = 8;
+
+  while (offset + 8 <= bytes.length) {
+    const type = readType(view, offset);
+    const length = view.getUint32(offset + 4);
+    if (length < 8 || offset + length > bytes.length) break;
+
+    const start = offset + 8;
+    const end = offset + length;
+    for (let cursor = start; cursor + PNG.length <= end; cursor++) {
+      if (isPng(bytes, cursor)) {
+        candidates.push({ size: typeSize(type), data: bytes.slice(cursor, end) });
+        break;
+      }
+    }
+    offset += length;
+  }
+
+  candidates.sort((a, b) => b.size - a.size || b.data.length - a.data.length);
+  if (!candidates.length) throw new Error("This ICNS uses a representation not supported by the browser converter yet.");
+  return candidates[0].data;
+}
+
+async function imageFromPng(png: Uint8Array): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return image;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function renderPng(source: Uint8Array, size: number): Promise<Uint8Array> {
+  const image = await imageFromPng(source);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is unavailable.");
+  context.clearRect(0, 0, size, size);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(image, 0, 0, size, size);
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("PNG encoding failed.");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+export async function icnsToPng(buffer: ArrayBuffer): Promise<Blob> {
+  return new Blob([await renderPng(extractBestPng(buffer), 1024)], { type: "image/png" });
+}
+
+export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
+  const source = extractBestPng(buffer);
+  const sizes = [16, 24, 32, 48, 64, 128, 256];
+  const images = await Promise.all(sizes.map((size) => renderPng(source, size)));
+  const imageStart = 6 + sizes.length * 16;
+  const total = imageStart + images.reduce((sum, item) => sum + item.length, 0);
+  const output = new ArrayBuffer(total);
+  const view = new DataView(output);
+  const bytes = new Uint8Array(output);
+
+  view.setUint16(0, 0, true);
+  view.setUint16(2, 1, true);
+  view.setUint16(4, sizes.length, true);
+
+  let cursor = imageStart;
+  sizes.forEach((size, index) => {
+    const entry = 6 + index * 16;
+    const image = images[index];
+    view.setUint8(entry, size === 256 ? 0 : size);
+    view.setUint8(entry + 1, size === 256 ? 0 : size);
+    view.setUint8(entry + 2, 0);
+    view.setUint8(entry + 3, 0);
+    view.setUint16(entry + 4, 1, true);
+    view.setUint16(entry + 6, 32, true);
+    view.setUint32(entry + 8, image.length, true);
+    view.setUint32(entry + 12, cursor, true);
+    bytes.set(image, cursor);
+    cursor += image.length;
+  });
+
+  return new Blob([output], { type: "image/x-icon" });
+}
+
+export async function previewUrl(buffer: ArrayBuffer): Promise<string> {
+  return URL.createObjectURL(new Blob([extractBestPng(buffer)], { type: "image/png" }));
+}
+
+export function download(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function filename(name: string, extension: string): string {
+  const safe = name.replace(/[<>:"/|?*]/g, "").trim() || "icon";
+  return safe + "." + extension;
+}

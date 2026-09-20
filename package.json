@@ -1,19 +1,25 @@
 {
   "name": "iconflow",
-  "version": "2.0.0",
-  "description": "IconFlow — One-click macOS icon downloader with GUI",
-  "main": "src/server.js",
+  "private": true,
+  "version": "3.0.0",
+  "description": "IconFlow — client-side macOS icon search and ICNS to PNG/ICO converter.",
+  "type": "module",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node src/server.js"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "license": "MIT",
   "dependencies": {
-    "@fiahfy/icns": "^0.0.7",
-    "sharp": "^0.33.5",
-    "sharp-ico": "^0.1.5"
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
   }
 }
