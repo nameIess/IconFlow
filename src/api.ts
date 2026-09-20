@@ -23,6 +23,7 @@ export type SearchResponse = {
 
 const API = "https://api.macosicons.com/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
+export const SEARCH_PAGE_SIZE = 100;
 
 async function readResponse(response: Response): Promise<unknown> {
   const type = response.headers.get("content-type") || "";
@@ -51,7 +52,7 @@ async function request(path: string, init: RequestInit): Promise<Response> {
 export async function searchIcons(
   key: string,
   query: string,
-  limit = 24,
+  limit = SEARCH_PAGE_SIZE,
   page = 1,
 ): Promise<SearchResponse> {
   const normalizedKey = key.trim();
@@ -61,7 +62,7 @@ export async function searchIcons(
   if (!normalizedQuery) throw new Error("Enter an app name to search.");
   if (normalizedQuery.length > 100) throw new Error("Search must be 100 characters or fewer.");
 
-  const normalizedLimit = Math.min(Math.max(limit, 1), 50);
+  const normalizedLimit = Math.min(Math.max(limit, 1), SEARCH_PAGE_SIZE);
   const normalizedPage = Math.max(1, Math.floor(page));
 
   const response = await request("/search", {
