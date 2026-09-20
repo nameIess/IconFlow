@@ -38,6 +38,7 @@ function App() {
   const [apiKey, setApiKeyState] = useState(getStoredKey);
   const [draftKey, setDraftKey] = useState(getStoredKey);
   const [query, setQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
   const [results, setResults] = useState<IconHit[]>([]);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
@@ -45,6 +46,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
+  const searchRequestId = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
   const [testing, setTesting] = useState(false);
   const [format, setFormat] = useState<Format>("ico");
@@ -75,28 +77,35 @@ function App() {
       return;
     }
 
+    const requestId = ++searchRequestId.current;
     setLoading(true);
     setLoadingMore(false);
+    setActiveQuery(value);
     setResults([]);
     setCurrentPage(0);
     setTotalPages(1);
 
     try {
       const data = await searchIcons(apiKey, value, 24, 1);
+      if (requestId !== searchRequestId.current) return;
       setResults(data.hits || []);
       setTotal(data.totalHits || data.hits?.length || 0);
       setCurrentPage(data.page || 1);
       setTotalPages(data.totalPages || 1);
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "Search failed.");
+      if (requestId === searchRequestId.current) {
+        setToast(error instanceof Error ? error.message : "Search failed.");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestId.current) {
+        setLoading(false);
+      }
     }
   }
 
   async function loadMore() {
-    const value = query.trim();
+    const value = activeQuery.trim();
     if (
       loading ||
       loadingMore ||
@@ -109,10 +118,12 @@ function App() {
     }
 
     const nextPage = currentPage + 1;
+    const requestId = searchRequestId.current;
     setLoadingMore(true);
 
     try {
       const data = await searchIcons(apiKey, value, 24, nextPage);
+      if (requestId !== searchRequestId.current) return;
       setResults((previous) => {
         const seen = new Set(
           previous.map((hit) => hit.objectID || hit.icnsUrl || hit.appName),
@@ -129,9 +140,13 @@ function App() {
       setTotalPages(data.totalPages || totalPages);
       setTotal(data.totalHits || total);
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "Unable to load more icons.");
+      if (requestId === searchRequestId.current) {
+        setToast(error instanceof Error ? error.message : "Unable to load more icons.");
+      }
     } finally {
-      setLoadingMore(false);
+      if (requestId === searchRequestId.current) {
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -150,7 +165,7 @@ function App() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [currentPage, totalPages, results.length, loading, loadingMore, query, apiKey]);
+  }, [currentPage, totalPages, results.length, loading, loadingMore, activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
@@ -233,7 +248,7 @@ function App() {
       <div className="ambient ambient-two" />
 
       <header className="topbar glass">
-        <button className="brand" onClick={() => { setQuery(""); setResults([]); setTotal(0); setCurrentPage(0); setTotalPages(1); }}>
+        <button className="brand" onClick={() => { setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setCurrentPage(0); setTotalPages(1); }}>
           <span className="brand-mark">
             <IconMark />
           </span>
@@ -281,7 +296,7 @@ function App() {
           <div className="results-header">
             <div>
               <span className="section-kicker">{results.length ? "Search results" : "Explore"}</span>
-              <h2>{results.length ? query : "Your icon shelf"}</h2>
+              <h2>{results.length ? activeQuery : "Your icon shelf"}</h2>
             </div>
             {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} results</span>}
           </div>
