@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { fetchIcns, searchIcons, testApiKey, type IconHit } from "./api";
+import { fetchIcns, searchIcons, SEARCH_PAGE_SIZE, testApiKey, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -86,7 +86,7 @@ function App() {
     setTotalPages(1);
 
     try {
-      const data = await searchIcons(apiKey, value, 24, 1);
+      const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, 1);
       if (requestId !== searchRequestId.current) return;
       setResults(data.hits || []);
       setTotal(data.totalHits || data.hits?.length || 0);
@@ -122,7 +122,7 @@ function App() {
     setLoadingMore(true);
 
     try {
-      const data = await searchIcons(apiKey, value, 24, nextPage);
+      const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, nextPage);
       if (requestId !== searchRequestId.current) return;
       setResults((previous) => {
         const seen = new Set(
