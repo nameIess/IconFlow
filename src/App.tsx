@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -10,7 +10,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Sun,
   Trash2,
   X,
@@ -31,13 +30,21 @@ function getStoredKey(): string {
   }
 }
 
+function IconMark({ className = "" }: { className?: string }) {
+  return <img className={className} src="/favicon.svg" alt="" aria-hidden="true" />;
+}
+
 function App() {
   const [apiKey, setApiKeyState] = useState(getStoredKey);
   const [draftKey, setDraftKey] = useState(getStoredKey);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<IconHit[]>([]);
   const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
   const [testing, setTesting] = useState(false);
   const [format, setFormat] = useState<Format>("ico");
@@ -69,11 +76,17 @@ function App() {
     }
 
     setLoading(true);
+    setLoadingMore(false);
     setResults([]);
+    setCurrentPage(0);
+    setTotalPages(1);
+
     try {
-      const data = await searchIcons(apiKey, value, 24);
+      const data = await searchIcons(apiKey, value, 24, 1);
       setResults(data.hits || []);
       setTotal(data.totalHits || data.hits?.length || 0);
+      setCurrentPage(data.page || 1);
+      setTotalPages(data.totalPages || 1);
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Search failed.");
@@ -81,6 +94,63 @@ function App() {
       setLoading(false);
     }
   }
+
+  async function loadMore() {
+    const value = query.trim();
+    if (
+      loading ||
+      loadingMore ||
+      !apiKey ||
+      !value ||
+      currentPage < 1 ||
+      currentPage >= totalPages
+    ) {
+      return;
+    }
+
+    const nextPage = currentPage + 1;
+    setLoadingMore(true);
+
+    try {
+      const data = await searchIcons(apiKey, value, 24, nextPage);
+      setResults((previous) => {
+        const seen = new Set(
+          previous.map((hit) => hit.objectID || hit.icnsUrl || hit.appName),
+        );
+        const additions = data.hits.filter((hit) => {
+          const id = hit.objectID || hit.icnsUrl || hit.appName;
+          if (seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+        return [...previous, ...additions];
+      });
+      setCurrentPage(data.page || nextPage);
+      setTotalPages(data.totalPages || totalPages);
+      setTotal(data.totalHits || total);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to load more icons.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinel.current;
+    if (!sentinel || !results.length || currentPage >= totalPages) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMore();
+        }
+      },
+      { rootMargin: "600px 0px", threshold: 0.01 },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [currentPage, totalPages, results.length, loading, loadingMore, query, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
@@ -163,9 +233,9 @@ function App() {
       <div className="ambient ambient-two" />
 
       <header className="topbar glass">
-        <button className="brand" onClick={() => { setQuery(""); setResults([]); setTotal(0); }}>
+        <button className="brand" onClick={() => { setQuery(""); setResults([]); setTotal(0); setCurrentPage(0); setTotalPages(1); }}>
           <span className="brand-mark">
-            <img src="/favicon.svg" alt="" aria-hidden="true" />
+            <IconMark />
           </span>
           <span>IconFlow</span>
         </button>
@@ -213,7 +283,7 @@ function App() {
               <span className="section-kicker">{results.length ? "Search results" : "Explore"}</span>
               <h2>{results.length ? query : "Your icon shelf"}</h2>
             </div>
-            {results.length > 0 && <span className="result-count">{total.toLocaleString()} results</span>}
+            {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} results</span>}
           </div>
 
           {loading ? (
@@ -229,7 +299,7 @@ function App() {
                   <article className="icon-card glass" key={id + index}>
                     <button className="preview-button" onClick={() => openPreview(hit)} aria-label={"Preview " + hit.appName}>
                       <div className="icon-art">
-                        {hit.lowResPngUrl ? <img src={hit.lowResPngUrl} alt="" loading="lazy" /> : <Sparkles size={44} />}
+                        {hit.lowResPngUrl ? <img src={hit.lowResPngUrl} alt="" loading="lazy" /> : <IconMark className="fallback-icon" />}
                       </div>
                       <span className="preview-hint">Preview ICNS</span>
                     </button>
@@ -269,7 +339,7 @@ function App() {
             </div>
           ) : (
             <div className="empty-state glass">
-              <div className="empty-icon"><Sparkles size={25} /></div>
+              <div className="empty-icon"><IconMark /></div>
               <h3>Search 30,000+ macOS icons</h3>
               <p>Enter an app name above. IconFlow fetches the original ICNS only when you need a high-resolution preview or download.</p>
               <div className="suggestions">
@@ -279,6 +349,20 @@ function App() {
               </div>
             </div>
           )}
+
+          {results.length > 0 && (
+            <div className="infinite-results-status" aria-live="polite">
+              {loadingMore ? (
+                <>
+                  <LoaderCircle className="spin" size={17} />
+                  Loading more icons…
+                </>
+              ) : currentPage >= totalPages ? (
+                <>You’ve reached the end of the results.</>
+              ) : null}
+            </div>
+          )}
+          <div ref={loadMoreSentinel} className="load-more-sentinel" aria-hidden="true" />
         </section>
       </main>
 
@@ -342,7 +426,7 @@ function App() {
               <button className="icon-button" onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button>
             </div>
             <div className="large-preview">
-              {preview.loading ? <LoaderCircle className="spin" size={30} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <Sparkles size={50} />}
+              {preview.loading ? <LoaderCircle className="spin" size={30} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <IconMark className="preview-fallback-icon" />}
             </div>
             <div className="preview-actions">
               <button className="secondary-button" disabled={preview.loading} onClick={() => downloadIcon(preview.hit, "png")}><Download size={16} /> PNG</button>
