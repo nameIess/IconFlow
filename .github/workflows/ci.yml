@@ -2,9 +2,9 @@ name: Build IconFlow
 
 on:
   push:
-    branches: [gpt]
+    branches: [master]
   pull_request:
-    branches: [gpt]
+    branches: [master]
 
 jobs:
   build:
