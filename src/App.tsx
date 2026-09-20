@@ -197,7 +197,7 @@ function App() {
             />
             <button className="search-submit" type="submit" disabled={loading}>
               {loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}
-              Search
+              <span className="search-label">Search</span>
             </button>
           </form>
 
