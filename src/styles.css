@@ -79,10 +79,18 @@ a { color: inherit; }
   font-size: 17px;
 }
 .brand-mark {
-  width: 34px; height: 34px; display: grid; place-items: center;
+  width: 38px; height: 38px; display: grid; place-items: center;
+  overflow: hidden;
   border-radius: 11px; color: white;
   background: linear-gradient(145deg, #9fc4ff, #4f7fff);
   box-shadow: 0 8px 24px rgba(79,127,255,.3);
+}
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  object-fit: contain;
+  display: block;
 }
 .top-actions { display: flex; gap: 7px; align-items: center; }
 .icon-button, .settings-button, .secondary-button, .danger-button, .primary-button, .small-button {
@@ -106,7 +114,7 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .search-panel input { min-width: 0; flex: 1; height: 48px; color: var(--text); background: transparent; border: 0; outline: 0; font-size: 15px; }
 .search-panel input::placeholder { color: var(--muted-2); }
 .search-submit, .primary-button { border: 0; background: linear-gradient(145deg, #7daeff, #4c80f5); color: #fff; box-shadow: 0 8px 24px rgba(76,128,245,.28); }
-.search-submit { height: 48px; padding: 0 18px; border-radius: 14px; display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.search-submit { height: 48px; padding: 0 18px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; }
 .search-submit:disabled, .primary-button:disabled, .download-button:disabled { opacity: .55; cursor: wait; }
 .hero-meta { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 14px; color: var(--muted-2); font-size: 12px; }
 .hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
@@ -200,8 +208,15 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   .hero { padding: 78px 0 55px; }
   .hero h1 { font-size: clamp(42px, 13vw, 62px); }
   .search-panel { border-radius: 17px; }
-  .search-submit { padding: 0 13px; font-size: 0; }
-  .search-submit svg { margin: 0; }
+  .search-submit { border-radius: 14px; }
+  .search-submit {
+    width: 48px;
+    flex: 0 0 48px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+  }
+  .search-label { display: none; }
   .icon-grid, .skeleton-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .results-header h2 { font-size: 21px; }
   footer { flex-wrap: wrap; }
