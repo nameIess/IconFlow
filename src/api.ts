@@ -23,7 +23,48 @@ export type SearchResponse = {
 
 const API = "https://api.macosicons.com/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
-export const SEARCH_PAGE_SIZE = 100;
+export const SEARCH_PAGE_SIZE = Math.max(1, Number(import.meta.env.VITE_SEARCH_PAGE_SIZE || 100));
+const MIN_SEARCH_INTERVAL_MS = Math.max(0, Number(import.meta.env.VITE_MIN_SEARCH_INTERVAL_MS || 1500));
+const SEARCH_CACHE_TTL_MS = Math.max(0, Number(import.meta.env.VITE_SEARCH_CACHE_TTL_MS || 120000));
+const RATE_LIMIT_COOLDOWN_MS = Math.max(5000, Number(import.meta.env.VITE_RATE_LIMIT_COOLDOWN_MS || 60000));
+const SEARCH_WINDOW_MS = Math.max(1000, Number(import.meta.env.VITE_SEARCH_WINDOW_MS || 60000));
+const MAX_SEARCHES_PER_WINDOW = Math.max(1, Number(import.meta.env.VITE_MAX_SEARCHES_PER_WINDOW || 20));
+
+const searchCache = new Map<string, { expiresAt: number; data: SearchResponse }>();
+const requestTimes: number[] = [];
+let lastSearchStartedAt = 0;
+let rateLimitBlockedUntil = 0;
+
+export function clearSearchCache(): void {
+  searchCache.clear();
+}
+
+function pruneRequestTimes(now: number): void {
+  while (requestTimes.length && now - requestTimes[0] >= SEARCH_WINDOW_MS) requestTimes.shift();
+}
+
+async function waitForSearchSlot(): Promise<void> {
+  const now = Date.now();
+  pruneRequestTimes(now);
+  if (now < rateLimitBlockedUntil) {
+    const seconds = Math.ceil((rateLimitBlockedUntil - now) / 1000);
+    throw new Error(`Search temporarily paused after a rate-limit response. Try again in ${seconds}s.`);
+  }
+  const spacingWait = Math.max(0, MIN_SEARCH_INTERVAL_MS - (now - lastSearchStartedAt));
+  if (spacingWait > 0) await new Promise((resolve) => window.setTimeout(resolve, spacingWait));
+  const afterSpacing = Date.now();
+  pruneRequestTimes(afterSpacing);
+  if (requestTimes.length >= MAX_SEARCHES_PER_WINDOW) {
+    const waitMs = Math.max(1, SEARCH_WINDOW_MS - (afterSpacing - requestTimes[0]));
+    throw new Error(`Search limit reached in this browser. Try again in ${Math.ceil(waitMs / 1000)}s.`);
+  }
+  lastSearchStartedAt = afterSpacing;
+  requestTimes.push(afterSpacing);
+}
+
+function getCacheKey(key: string, query: string, limit: number, page: number): string {
+  return `${key.length}:${query.toLowerCase()}:${limit}:${page}`;
+}
 
 async function readResponse(response: Response): Promise<unknown> {
   const type = response.headers.get("content-type") || "";
@@ -64,6 +105,12 @@ export async function searchIcons(
 
   const normalizedLimit = Math.min(Math.max(limit, 1), SEARCH_PAGE_SIZE);
   const normalizedPage = Math.max(1, Math.floor(page));
+  const cacheKey = getCacheKey(normalizedKey, normalizedQuery, normalizedLimit, normalizedPage);
+  const cached = searchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  if (cached) searchCache.delete(cacheKey);
+
+  await waitForSearchSlot();
 
   const response = await request("/search", {
     method: "POST",
@@ -82,7 +129,8 @@ export async function searchIcons(
       throw new Error("The API key was rejected. Check your macOSicons key in Settings.");
     }
     if (response.status === 429) {
-      throw new Error("macOSicons rate limit reached. Wait a moment and try again.");
+      rateLimitBlockedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+      throw new Error(`macOSicons rate limit reached. Search paused for ${Math.ceil(RATE_LIMIT_COOLDOWN_MS / 1000)}s to avoid repeated requests.`);
     }
     throw new Error(data?.error || data?.message || "macOSicons request failed (" + response.status + ").");
   }
@@ -91,7 +139,9 @@ export async function searchIcons(
     throw new Error("macOSicons returned an unexpected response.");
   }
 
-  return data as SearchResponse;
+  const result = data as SearchResponse;
+  searchCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, data: result });
+  return result;
 }
 
 export async function fetchIcns(url: string): Promise<ArrayBuffer> {
