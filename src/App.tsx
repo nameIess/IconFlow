@@ -51,8 +51,9 @@ function App() {
   const searchRequestId = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
   const [testing, setTesting] = useState(false);
-  const [format, setFormat] = useState<Format>("ico");
-  const [menu, setMenu] = useState<string | null>(null);
+  const [formatByIndex, setFormatByIndex] = useState<Record<number, Format>>({});
+  const [menu, setMenu] = useState<number | null>(null);
+  const loadingMoreRef = useRef(false);
   const [toast, setToast] = useState("");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -82,6 +83,7 @@ function App() {
     const requestId = ++searchRequestId.current;
     setLoading(true);
     setLoadingMore(false);
+    loadingMoreRef.current = false;
     setActiveQuery(value);
     setResults([]);
     setTotal(0);
@@ -119,7 +121,7 @@ function App() {
 
     if (
       loading ||
-      loadingMore ||
+      loadingMoreRef.current ||
       !!loadMoreError ||
       !apiKey ||
       !value ||
@@ -131,6 +133,7 @@ function App() {
 
     const nextPage = currentPage + 1;
     const requestId = searchRequestId.current;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setLoadMoreError("");
 
@@ -174,7 +177,10 @@ function App() {
       }
     } finally {
       if (requestId === searchRequestId.current) {
+        loadingMoreRef.current = false;
         setLoadingMore(false);
+      } else {
+        loadingMoreRef.current = false;
       }
     }
   }
@@ -198,7 +204,7 @@ function App() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [currentPage, totalPages, total, results.length, loading, loadingMore, activeQuery, apiKey]);
+  }, [currentPage, totalPages, total, results.length, activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
@@ -269,6 +275,34 @@ function App() {
       setToast(error instanceof Error ? error.message : "Download failed.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (menu === null) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest(".format-menu")) {
+        setMenu(null);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menu]);
+
+  function isSafeCreditUrl(value: string | undefined): value is string {
+    if (!value) return false;
+    try {
+      return new URL(value, window.location.href).protocol === "https:";
+    } catch {
+      return false;
     }
   }
 
@@ -344,6 +378,7 @@ function App() {
             <div className="icon-grid">
               {results.map((hit, index) => {
                 const id = hit.objectID || hit.icnsUrl || hit.appName;
+                const selectedFormat = formatByIndex[index] || "ico";
                 const busy = busyId === id;
                 return (
                   <article className="icon-card glass" key={id + index}>
@@ -361,13 +396,13 @@ function App() {
                           <p>{hit.category || "macOS icon"}</p>
                         </div>
                         <div className="format-menu">
-                          <button className="small-button" onClick={() => setMenu(menu === id ? null : id)}>
-                            {format.toUpperCase()} <ChevronDown size={13} />
+                          <button className="small-button" onClick={() => setMenu(menu === index ? null : index)}>
+                            {selectedFormat.toUpperCase()} <ChevronDown size={13} />
                           </button>
-                          {menu === id && (
+                          {menu === index && (
                             <div className="dropdown glass">
-                              <button onClick={() => { setFormat("png"); setMenu(null); }}>PNG</button>
-                              <button onClick={() => { setFormat("ico"); setMenu(null); }}>ICO</button>
+                              <button onClick={() => { setFormatByIndex((current) => ({ ...current, [index]: "png" })); setMenu(null); }}>PNG</button>
+                              <button onClick={() => { setFormatByIndex((current) => ({ ...current, [index]: "ico" })); setMenu(null); }}>ICO</button>
                             </div>
                           )}
                         </div>
@@ -375,11 +410,11 @@ function App() {
 
                       <div className="card-footer">
                         <span className="credit">
-                          {hit.creditUrl ? <a href={hit.creditUrl} target="_blank" rel="noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}
+                          {isSafeCreditUrl(hit.creditUrl) ? <a href={hit.creditUrl} target="_blank" rel="noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}
                         </span>
-                        <button className="download-button" disabled={busy} onClick={() => downloadIcon(hit, format)}>
+                        <button className="download-button" disabled={busy} onClick={() => downloadIcon(hit, selectedFormat)}>
                           {busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
-                          {busy ? "Working" : format.toUpperCase()}
+                          {busy ? "Working" : selectedFormat.toUpperCase()}
                         </button>
                       </div>
                     </div>
@@ -488,7 +523,7 @@ function App() {
             </div>
             <div className="creator-line">
               <span>Credit: {preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>
-              {preview.hit.creditUrl && <a href={preview.hit.creditUrl} target="_blank" rel="noreferrer">View creator <ExternalLink size={12} /></a>}
+              {isSafeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noreferrer">View creator <ExternalLink size={12} /></a>}
             </div>
           </section>
         </div>
