@@ -63,7 +63,12 @@ async function waitForSearchSlot(): Promise<void> {
 }
 
 function getCacheKey(key: string, query: string, limit: number, page: number): string {
-  return `${key.length}:${query.toLowerCase()}:${limit}:${page}`;
+  let hash = 2166136261;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${(hash >>> 0).toString(16)}:${query.toLowerCase()}:${limit}:${page}`;
 }
 
 async function readResponse(response: Response): Promise<unknown> {
