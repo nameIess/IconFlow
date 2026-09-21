@@ -47,16 +47,13 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState("");
-  const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
   const searchRequestId = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
   const [testing, setTesting] = useState(false);
   const [formatByIndex, setFormatByIndex] = useState<Record<number, Format>>({});
   const [menu, setMenu] = useState<number | null>(null);
   const loadingMoreRef = useRef(false);
-  const loadMoreArmedRef = useRef(true);
   const paginationStoppedRef = useRef(false);
-  const loadMoreFnRef = useRef<() => void>(() => {});
   const [toast, setToast] = useState("");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -87,7 +84,6 @@ function App() {
     setLoading(true);
     setLoadingMore(false);
     loadingMoreRef.current = false;
-    loadMoreArmedRef.current = true;
     paginationStoppedRef.current = false;
     setActiveQuery(value);
     setResults([]);
@@ -110,7 +106,6 @@ function App() {
         data.totalPages || Math.max(1, Math.ceil((data.totalHits || data.hits?.length || 0) / effectivePageSize)),
       );
       setPageSize(effectivePageSize);
-      loadMoreArmedRef.current = true;
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
       if (requestId === searchRequestId.current) {
@@ -200,35 +195,7 @@ function App() {
     }
   }
 
-  loadMoreFnRef.current = () => {
-    void loadMore();
-  };
 
-  useEffect(() => {
-    const sentinel = loadMoreSentinel.current;
-    if (!sentinel || !activeQuery || !apiKey) return;
-
-    loadMoreArmedRef.current = true;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) {
-            loadMoreArmedRef.current = true;
-            continue;
-          }
-
-          if (!loadMoreArmedRef.current) continue;
-          loadMoreArmedRef.current = false;
-          loadMoreFnRef.current();
-        }
-      },
-      { rootMargin: "300px 0px", threshold: 0.01 },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
@@ -477,7 +444,6 @@ function App() {
               ) : null}
             </div>
           )}
-          <div ref={loadMoreSentinel} className="load-more-sentinel" aria-hidden="true" />
         </section>
       </main>
 
