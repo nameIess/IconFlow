@@ -55,6 +55,7 @@ function App() {
   const [menu, setMenu] = useState<number | null>(null);
   const loadingMoreRef = useRef(false);
   const loadMoreArmedRef = useRef(true);
+  const paginationStoppedRef = useRef(false);
   const loadMoreFnRef = useRef<() => void>(() => {});
   const [toast, setToast] = useState("");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
@@ -87,6 +88,7 @@ function App() {
     setLoadingMore(false);
     loadingMoreRef.current = false;
     loadMoreArmedRef.current = true;
+    paginationStoppedRef.current = false;
     setActiveQuery(value);
     setResults([]);
     setTotal(0);
@@ -126,6 +128,7 @@ function App() {
     if (
       loading ||
       loadingMoreRef.current ||
+      paginationStoppedRef.current ||
       !!loadMoreError ||
       !apiKey ||
       !value ||
@@ -145,25 +148,31 @@ function App() {
       const data = await searchIcons(apiKey, value, pageSize, nextPage);
       if (requestId !== searchRequestId.current) return;
 
-      setResults((previous) => {
-        const seen = new Set(
-          previous
-            .map((hit) => hit.objectID || hit.icnsUrl)
-            .filter((id): id is string => Boolean(id)),
-        );
-        const additions = data.hits.filter((hit) => {
-          const id = hit.objectID || hit.icnsUrl;
+      const seen = new Set(
+        results
+          .map((hit) => hit.objectID || hit.icnsUrl)
+          .filter((id): id is string => Boolean(id)),
+      );
+      const additions = data.hits.filter((hit) => {
+        const id = hit.objectID || hit.icnsUrl;
 
-          // appName is not a unique identifier: a search can legitimately
-          // return many variants of the same app. Only deduplicate when the
-          // API gives us a stable identity.
-          if (!id) return true;
-          if (seen.has(id)) return false;
-          seen.add(id);
-          return true;
-        });
-        return [...previous, ...additions];
+        // appName is not a unique identifier: a search can legitimately
+        // return many variants of the same app. Only deduplicate when the
+        // API gives us a stable identity.
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
       });
+
+      if (!additions.length) {
+        paginationStoppedRef.current = true;
+        setLoadMoreError("Pagination stopped because macOSicons returned no new icons. No more requests will be made automatically.");
+        setToast("No new icons were returned. Pagination was stopped to protect your API quota.");
+        return;
+      }
+
+      setResults((previous) => [...previous, ...additions]);
 
       const effectivePageSize = data.limit > 0 ? data.limit : data.hits.length || pageSize;
       const nextTotal = data.totalHits || total;
