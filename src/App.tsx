@@ -140,10 +140,17 @@ function App() {
 
       setResults((previous) => {
         const seen = new Set(
-          previous.map((hit) => hit.objectID || hit.icnsUrl || hit.appName),
+          previous
+            .map((hit) => hit.objectID || hit.icnsUrl)
+            .filter((id): id is string => Boolean(id)),
         );
         const additions = data.hits.filter((hit) => {
-          const id = hit.objectID || hit.icnsUrl || hit.appName;
+          const id = hit.objectID || hit.icnsUrl;
+
+          // appName is not a unique identifier: a search can legitimately
+          // return many variants of the same app. Only deduplicate when the
+          // API gives us a stable identity.
+          if (!id) return true;
           if (seen.has(id)) return false;
           seen.add(id);
           return true;
