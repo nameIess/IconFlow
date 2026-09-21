@@ -54,6 +54,8 @@ function App() {
   const [formatByIndex, setFormatByIndex] = useState<Record<number, Format>>({});
   const [menu, setMenu] = useState<number | null>(null);
   const loadingMoreRef = useRef(false);
+  const loadMoreArmedRef = useRef(true);
+  const loadMoreFnRef = useRef<() => void>(() => {});
   const [toast, setToast] = useState("");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -84,6 +86,7 @@ function App() {
     setLoading(true);
     setLoadingMore(false);
     loadingMoreRef.current = false;
+    loadMoreArmedRef.current = true;
     setActiveQuery(value);
     setResults([]);
     setTotal(0);
@@ -103,6 +106,7 @@ function App() {
         data.totalPages || Math.max(1, Math.ceil((data.totalHits || data.hits?.length || 0) / effectivePageSize)),
       );
       setPageSize(effectivePageSize);
+      loadMoreArmedRef.current = true;
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
       if (requestId === searchRequestId.current) {
@@ -185,26 +189,35 @@ function App() {
     }
   }
 
+  loadMoreFnRef.current = () => {
+    void loadMore();
+  };
+
   useEffect(() => {
     const sentinel = loadMoreSentinel.current;
-    if (
-      !sentinel ||
-      !results.length ||
-      (total > 0 ? results.length >= total : currentPage >= totalPages)
-    ) return;
+    if (!sentinel || !activeQuery || !apiKey) return;
+
+    loadMoreArmedRef.current = true;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          void loadMore();
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            loadMoreArmedRef.current = true;
+            continue;
+          }
+
+          if (!loadMoreArmedRef.current) continue;
+          loadMoreArmedRef.current = false;
+          loadMoreFnRef.current();
         }
       },
-      { rootMargin: "600px 0px", threshold: 0.01 },
+      { rootMargin: "300px 0px", threshold: 0.01 },
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [currentPage, totalPages, total, results.length, activeQuery, apiKey]);
+  }, [activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
