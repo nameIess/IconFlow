@@ -96,6 +96,8 @@ function App() {
     setTotalPages(1);
     setPageSize(SEARCH_PAGE_SIZE);
     setLoadMoreError("");
+    setFormatByIndex({});
+    setMenu(null);
 
     try {
       const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, 1);
@@ -464,6 +466,8 @@ function App() {
                   <LoaderCircle className="spin" size={17} />
                   Loading more icons…
                 </>
+              ) : paginationStoppedRef.current ? (
+                <>Pagination stopped to protect your API quota.</>
               ) : loadMoreError ? (
                 <button className="secondary-button" onClick={() => { setLoadMoreError(""); void loadMore(); }}>
                   Try loading more
