@@ -43,6 +43,7 @@ function App() {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(SEARCH_PAGE_SIZE);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState("");
@@ -83,16 +84,23 @@ function App() {
     setLoadingMore(false);
     setActiveQuery(value);
     setResults([]);
+    setTotal(0);
     setCurrentPage(0);
     setTotalPages(1);
+    setPageSize(SEARCH_PAGE_SIZE);
+    setLoadMoreError("");
 
     try {
       const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, 1);
       if (requestId !== searchRequestId.current) return;
+      const effectivePageSize = data.limit > 0 ? data.limit : data.hits?.length || SEARCH_PAGE_SIZE;
       setResults(data.hits || []);
       setTotal(data.totalHits || data.hits?.length || 0);
       setCurrentPage(data.page || 1);
-      setTotalPages(data.totalPages || 1);
+      setTotalPages(
+        data.totalPages || Math.max(1, Math.ceil((data.totalHits || data.hits?.length || 0) / effectivePageSize)),
+      );
+      setPageSize(effectivePageSize);
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
       if (requestId === searchRequestId.current) {
@@ -127,7 +135,7 @@ function App() {
     setLoadMoreError("");
 
     try {
-      const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, nextPage);
+      const data = await searchIcons(apiKey, value, pageSize, nextPage);
       if (requestId !== searchRequestId.current) return;
 
       setResults((previous) => {
@@ -143,9 +151,14 @@ function App() {
         return [...previous, ...additions];
       });
 
+      const effectivePageSize = data.limit > 0 ? data.limit : data.hits.length || pageSize;
+      const nextTotal = data.totalHits || total;
       setCurrentPage(data.page || nextPage);
-      setTotalPages(data.totalPages || totalPages);
-      setTotal(data.totalHits || total);
+      setTotalPages(
+        data.totalPages || Math.max(1, Math.ceil(nextTotal / effectivePageSize)),
+      );
+      setTotal(nextTotal);
+      setPageSize(effectivePageSize);
     } catch (error) {
       if (requestId === searchRequestId.current) {
         const message = error instanceof Error ? error.message : "Unable to load more icons.";
@@ -161,7 +174,11 @@ function App() {
 
   useEffect(() => {
     const sentinel = loadMoreSentinel.current;
-    if (!sentinel || !results.length || currentPage >= totalPages) return;
+    if (
+      !sentinel ||
+      !results.length ||
+      (total > 0 ? results.length >= total : currentPage >= totalPages)
+    ) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -174,7 +191,7 @@ function App() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [currentPage, totalPages, results.length, loading, loadingMore, activeQuery, apiKey]);
+  }, [currentPage, totalPages, total, results.length, loading, loadingMore, activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
