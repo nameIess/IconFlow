@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, testApiKey, type IconHit } from "./api";
+import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -43,14 +43,17 @@ function App() {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(SEARCH_PAGE_SIZE);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState("");
   const searchRequestId = useRef(0);
   const [settingsOpen, setSettingsOpen] = useState(!getStoredKey());
   const [testing, setTesting] = useState(false);
-  const [format, setFormat] = useState<Format>("ico");
-  const [menu, setMenu] = useState<string | null>(null);
+  const [formatByIndex, setFormatByIndex] = useState<Record<number, Format>>({});
+  const [menu, setMenu] = useState<number | null>(null);
+  const loadingMoreRef = useRef(false);
+  const paginationStoppedRef = useRef(false);
   const [toast, setToast] = useState("");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -80,18 +83,29 @@ function App() {
     const requestId = ++searchRequestId.current;
     setLoading(true);
     setLoadingMore(false);
+    loadingMoreRef.current = false;
+    paginationStoppedRef.current = false;
     setActiveQuery(value);
     setResults([]);
+    setTotal(0);
     setCurrentPage(0);
     setTotalPages(1);
+    setPageSize(SEARCH_PAGE_SIZE);
+    setLoadMoreError("");
+    setFormatByIndex({});
+    setMenu(null);
 
     try {
       const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, 1);
       if (requestId !== searchRequestId.current) return;
+      const effectivePageSize = data.limit > 0 ? data.limit : data.hits?.length || SEARCH_PAGE_SIZE;
       setResults(data.hits || []);
       setTotal(data.totalHits || data.hits?.length || 0);
       setCurrentPage(data.page || 1);
-      setTotalPages(data.totalPages || 1);
+      setTotalPages(
+        data.totalPages || Math.max(1, Math.ceil((data.totalHits || data.hits?.length || 0) / effectivePageSize)),
+      );
+      setPageSize(effectivePageSize);
       if (!data.hits?.length) setToast("No icons found. Try another search.");
     } catch (error) {
       if (requestId === searchRequestId.current) {
@@ -106,66 +120,82 @@ function App() {
 
   async function loadMore() {
     const value = activeQuery.trim();
+    const hasMoreResults = total > 0 ? results.length < total : currentPage < totalPages;
+
     if (
       loading ||
-      loadingMore ||
+      loadingMoreRef.current ||
+      paginationStoppedRef.current ||
+      !!loadMoreError ||
       !apiKey ||
       !value ||
       currentPage < 1 ||
-      currentPage >= totalPages
+      !hasMoreResults
     ) {
       return;
     }
 
     const nextPage = currentPage + 1;
     const requestId = searchRequestId.current;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
+    setLoadMoreError("");
 
     try {
-      const data = await searchIcons(apiKey, value, SEARCH_PAGE_SIZE, nextPage);
+      const data = await searchIcons(apiKey, value, pageSize, nextPage);
       if (requestId !== searchRequestId.current) return;
-      setResults((previous) => {
-        const seen = new Set(
-          previous.map((hit) => hit.objectID || hit.icnsUrl || hit.appName),
-        );
-        const additions = data.hits.filter((hit) => {
-          const id = hit.objectID || hit.icnsUrl || hit.appName;
-          if (seen.has(id)) return false;
-          seen.add(id);
-          return true;
-        });
-        return [...previous, ...additions];
+
+      const seen = new Set(
+        results
+          .map((hit) => hit.objectID || hit.icnsUrl)
+          .filter((id): id is string => Boolean(id)),
+      );
+      const additions = data.hits.filter((hit) => {
+        const id = hit.objectID || hit.icnsUrl;
+
+        // appName is not a unique identifier: a search can legitimately
+        // return many variants of the same app. Only deduplicate when the
+        // API gives us a stable identity.
+        if (!id) return true;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
       });
+
+      if (!additions.length) {
+        paginationStoppedRef.current = true;
+        setLoadMoreError("Pagination stopped because macOSicons returned no new icons. No more requests will be made automatically.");
+        setToast("No new icons were returned. Pagination was stopped to protect your API quota.");
+        return;
+      }
+
+      setResults((previous) => [...previous, ...additions]);
+
+      const effectivePageSize = data.limit > 0 ? data.limit : data.hits.length || pageSize;
+      const nextTotal = data.totalHits || total;
       setCurrentPage(data.page || nextPage);
-      setTotalPages(data.totalPages || totalPages);
-      setTotal(data.totalHits || total);
+      setTotalPages(
+        data.totalPages || Math.max(1, Math.ceil(nextTotal / effectivePageSize)),
+      );
+      setTotal(nextTotal);
+      setPageSize(effectivePageSize);
     } catch (error) {
       if (requestId === searchRequestId.current) {
-        setToast(error instanceof Error ? error.message : "Unable to load more icons.");
+        const message = error instanceof Error ? error.message : "Unable to load more icons.";
+        setLoadMoreError(message);
+        setToast(message);
       }
     } finally {
       if (requestId === searchRequestId.current) {
+        loadingMoreRef.current = false;
         setLoadingMore(false);
+      } else {
+        loadingMoreRef.current = false;
       }
     }
   }
 
-  useEffect(() => {
-    const sentinel = loadMoreSentinel.current;
-    if (!sentinel || !results.length || currentPage >= totalPages) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          void loadMore();
-        }
-      },
-      { rootMargin: "600px 0px", threshold: 0.01 },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [currentPage, totalPages, results.length, loading, loadingMore, activeQuery, apiKey]);
 
   async function saveKey() {
     const value = draftKey.trim();
@@ -179,14 +209,13 @@ function App() {
 
     setTesting(true);
     try {
-      await testApiKey(value);
       localStorage.setItem(KEY, value);
       clearSearchCache();
       setApiKeyState(value);
       setSettingsOpen(false);
-      setToast("API key verified and saved locally.");
-    } catch (error) {
-      setToast(error instanceof Error ? error.message : "API key verification failed.");
+      setToast("API key saved locally. It will be validated on your next search.");
+    } catch {
+      setToast("Unable to save the API key in this browser.");
     } finally {
       setTesting(false);
     }
@@ -237,6 +266,34 @@ function App() {
       setToast(error instanceof Error ? error.message : "Download failed.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (menu === null) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest(".format-menu")) {
+        setMenu(null);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menu]);
+
+  function isSafeCreditUrl(value: string | undefined): value is string {
+    if (!value) return false;
+    try {
+      return new URL(value, window.location.href).protocol === "https:";
+    } catch {
+      return false;
     }
   }
 
@@ -312,6 +369,7 @@ function App() {
             <div className="icon-grid">
               {results.map((hit, index) => {
                 const id = hit.objectID || hit.icnsUrl || hit.appName;
+                const selectedFormat = formatByIndex[index] || "ico";
                 const busy = busyId === id;
                 return (
                   <article className="icon-card glass" key={id + index}>
@@ -329,13 +387,13 @@ function App() {
                           <p>{hit.category || "macOS icon"}</p>
                         </div>
                         <div className="format-menu">
-                          <button className="small-button" onClick={() => setMenu(menu === id ? null : id)}>
-                            {format.toUpperCase()} <ChevronDown size={13} />
+                          <button className="small-button" onClick={() => setMenu(menu === index ? null : index)}>
+                            {selectedFormat.toUpperCase()} <ChevronDown size={13} />
                           </button>
-                          {menu === id && (
+                          {menu === index && (
                             <div className="dropdown glass">
-                              <button onClick={() => { setFormat("png"); setMenu(null); }}>PNG</button>
-                              <button onClick={() => { setFormat("ico"); setMenu(null); }}>ICO</button>
+                              <button onClick={() => { setFormatByIndex((current) => ({ ...current, [index]: "png" })); setMenu(null); }}>PNG</button>
+                              <button onClick={() => { setFormatByIndex((current) => ({ ...current, [index]: "ico" })); setMenu(null); }}>ICO</button>
                             </div>
                           )}
                         </div>
@@ -343,11 +401,11 @@ function App() {
 
                       <div className="card-footer">
                         <span className="credit">
-                          {hit.creditUrl ? <a href={hit.creditUrl} target="_blank" rel="noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}
+                          {isSafeCreditUrl(hit.creditUrl) ? <a href={hit.creditUrl} target="_blank" rel="noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}
                         </span>
-                        <button className="download-button" disabled={busy} onClick={() => downloadIcon(hit, format)}>
+                        <button className="download-button" disabled={busy} onClick={() => downloadIcon(hit, selectedFormat)}>
                           {busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
-                          {busy ? "Working" : format.toUpperCase()}
+                          {busy ? "Working" : selectedFormat.toUpperCase()}
                         </button>
                       </div>
                     </div>
@@ -375,12 +433,17 @@ function App() {
                   <LoaderCircle className="spin" size={17} />
                   Loading more icons…
                 </>
-              ) : currentPage >= totalPages ? (
+              ) : paginationStoppedRef.current ? (
+                <>Pagination stopped to protect your API quota.</>
+              ) : loadMoreError ? (
+                <button className="secondary-button" onClick={() => { setLoadMoreError(""); void loadMore(); }}>
+                  Try loading more
+                </button>
+              ) : total > 0 && results.length >= total ? (
                 <>You’ve reached the end of the results.</>
               ) : null}
             </div>
           )}
-          <div ref={loadMoreSentinel} className="load-more-sentinel" aria-hidden="true" />
         </section>
       </main>
 
@@ -424,7 +487,7 @@ function App() {
               <button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button>
               <button className="primary-button" onClick={saveKey} disabled={testing || !draftKey.trim()}>
                 {testing ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
-                {testing ? "Verifying…" : "Verify & Save"}
+                {testing ? "Saving…" : "Save API Key"}
               </button>
             </div>
 
@@ -452,7 +515,7 @@ function App() {
             </div>
             <div className="creator-line">
               <span>Credit: {preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>
-              {preview.hit.creditUrl && <a href={preview.hit.creditUrl} target="_blank" rel="noreferrer">View creator <ExternalLink size={12} /></a>}
+              {isSafeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noreferrer">View creator <ExternalLink size={12} /></a>}
             </div>
           </section>
         </div>

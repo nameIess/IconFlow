@@ -18,7 +18,12 @@ function blobBytes(bytes: Uint8Array): ArrayBuffer {
 }
 
 function pngDimensions(png: Uint8Array): number {
-  if (png.length < 24) return 1024;
+  if (png.length < 24) throw new Error("The PNG source is truncated.");
+  if (
+    png[12] !== 73 || png[13] !== 72 || png[14] !== 68 || png[15] !== 82
+  ) {
+    throw new Error("The extracted ICNS data does not contain a valid PNG header.");
+  }
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
   const width = view.getUint32(16);
   const height = view.getUint32(20);
@@ -139,6 +144,6 @@ export function download(blob: Blob, name: string): void {
 }
 
 export function filename(name: string, extension: string): string {
-  const safe = name.replace(/[<>:"/|?*]/g, "").trim() || "icon";
+  const safe = name.replace(/[<>:"/|?*\\\\]/g, "").trim() || "icon";
   return safe + "." + extension;
 }
