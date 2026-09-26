@@ -4,12 +4,24 @@ import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, type IconHi
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
-const SEARCH_KEY = "iconflow.searchApiKey";
-const DOWNLOAD_KEY = "iconflow.downloadApiKey";
+const PRIMARY_KEY = "iconflow.primaryApiKey";
+const BACKUP_KEY = "iconflow.backupApiKey";
+const LEGACY_SEARCH_KEY = "iconflow.searchApiKey";
+const LEGACY_DOWNLOAD_KEY = "iconflow.downloadApiKey";
 const THEME_KEY = "iconflow.theme";
 
 function stored(key: string): string {
   try { return localStorage.getItem(key)?.trim() || ""; } catch { return ""; }
+}
+
+function storedWithLegacy(key: string, legacyKey: string): string {
+  const current = stored(key);
+  if (current) return current;
+  const legacy = stored(legacyKey);
+  if (legacy) {
+    try { localStorage.setItem(key, legacy); } catch {}
+  }
+  return legacy;
 }
 
 function IconMark({ className = "" }: { className?: string }) {
@@ -17,10 +29,10 @@ function IconMark({ className = "" }: { className?: string }) {
 }
 
 function App() {
-  const [searchApiKey, setSearchApiKey] = useState(() => stored(SEARCH_KEY));
-  const [downloadApiKey, setDownloadApiKey] = useState(() => stored(DOWNLOAD_KEY));
-  const [draftSearchKey, setDraftSearchKey] = useState(() => stored(SEARCH_KEY));
-  const [draftDownloadKey, setDraftDownloadKey] = useState(() => stored(DOWNLOAD_KEY));
+  const [primaryApiKey, setPrimaryApiKey] = useState(() => storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY));
+  const [backupApiKey, setBackupApiKey] = useState(() => storedWithLegacy(BACKUP_KEY, LEGACY_DOWNLOAD_KEY));
+  const [draftPrimaryKey, setDraftPrimaryKey] = useState(() => storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY));
+  const [draftBackupKey, setDraftBackupKey] = useState(() => storedWithLegacy(BACKUP_KEY, LEGACY_DOWNLOAD_KEY));
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
   const [results, setResults] = useState<IconHit[]>([]);
@@ -29,7 +41,7 @@ function App() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(() => !stored(SEARCH_KEY) || !stored(DOWNLOAD_KEY));
+  const [settingsOpen, setSettingsOpen] = useState(() => !storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY));
   const [formatById, setFormatById] = useState<Record<string, Format>>({});
   const [menuId, setMenuId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
@@ -74,7 +86,7 @@ function App() {
   async function search() {
     const value = query.trim();
     if (!value) return setToast("Enter an icon name to search.");
-    if (!searchApiKey) return setSettingsOpen(true);
+    if (!primaryApiKey) return setSettingsOpen(true);
 
     setLoading(true);
     setActiveQuery(value);
@@ -85,12 +97,13 @@ function App() {
     setMenuId(null);
 
     try {
-      const data = await searchIcons(searchApiKey, value, 1);
+      const data = await searchIcons(primaryApiKey, backupApiKey, value, 1);
       if (data.page !== 1 || data.offset !== 0 || data.hitsPerPage !== SEARCH_PAGE_SIZE) {
         throw new Error("The search API did not return the required 50-result first page.");
       }
       applyResponse(data);
-      if (!data.hits.length) setToast("No icons found. Try another search.");
+      if (data.usedBackup) setToast("Primary API key is rate-limited. Search continued with the backup key.");
+      else if (!data.hits.length) setToast("No icons found. Try another search.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Search failed.");
     } finally {
@@ -104,7 +117,7 @@ function App() {
     setMenuId(null);
 
     try {
-      const data = await searchIcons(searchApiKey, activeQuery, nextPage);
+      const data = await searchIcons(primaryApiKey, backupApiKey, activeQuery, nextPage);
       const expectedOffset = (nextPage - 1) * SEARCH_PAGE_SIZE;
 
       if (data.page !== nextPage || data.offset !== expectedOffset || data.hitsPerPage !== SEARCH_PAGE_SIZE) {
@@ -113,6 +126,7 @@ function App() {
       }
 
       applyResponse(data);
+      if (data.usedBackup) setToast("Primary API key is rate-limited. Search continued with the backup key.");
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Unable to load that page.");
     } finally {
@@ -121,14 +135,16 @@ function App() {
   }
 
   function saveSettings() {
-    const searchKey = draftSearchKey.trim();
-    const downloadKey = draftDownloadKey.trim();
+    const primaryKey = draftPrimaryKey.trim();
+    const backupKey = draftBackupKey.trim();
 
     try {
-      if (searchKey) localStorage.setItem(SEARCH_KEY, searchKey); else localStorage.removeItem(SEARCH_KEY);
-      if (downloadKey) localStorage.setItem(DOWNLOAD_KEY, downloadKey); else localStorage.removeItem(DOWNLOAD_KEY);
-      setSearchApiKey(searchKey);
-      setDownloadApiKey(downloadKey);
+      if (primaryKey) localStorage.setItem(PRIMARY_KEY, primaryKey); else localStorage.removeItem(PRIMARY_KEY);
+      if (backupKey) localStorage.setItem(BACKUP_KEY, backupKey); else localStorage.removeItem(BACKUP_KEY);
+      localStorage.removeItem(LEGACY_SEARCH_KEY);
+      localStorage.removeItem(LEGACY_DOWNLOAD_KEY);
+      setPrimaryApiKey(primaryKey);
+      setBackupApiKey(backupKey);
       setSettingsOpen(false);
       setToast("API keys saved locally in this browser.");
     } catch {
@@ -137,11 +153,12 @@ function App() {
   }
 
   function removeKeys() {
-    try { localStorage.removeItem(SEARCH_KEY); localStorage.removeItem(DOWNLOAD_KEY); } catch {}
-    setSearchApiKey("");
-    setDownloadApiKey("");
-    setDraftSearchKey("");
-    setDraftDownloadKey("");
+    try { localStorage.removeItem(PRIMARY_KEY); localStorage.removeItem(BACKUP_KEY);
+    localStorage.removeItem(LEGACY_SEARCH_KEY); localStorage.removeItem(LEGACY_DOWNLOAD_KEY); } catch {}
+    setPrimaryApiKey("");
+    setBackupApiKey("");
+    setDraftPrimaryKey("");
+    setDraftBackupKey("");
     clearSearchCache();
     setSettingsOpen(true);
     setToast("Both API keys were removed from this browser.");
@@ -166,13 +183,12 @@ function App() {
 
   async function downloadIcon(hit: IconHit, format: Format) {
     if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
-    if (!downloadApiKey) return setSettingsOpen(true);
 
     const id = hit.objectID || hit.icnsUrl || hit.appName;
     setBusyId(id);
     setMenuId(null);
     try {
-      const buffer = await fetchIcns(hit.icnsUrl, downloadApiKey);
+      const buffer = await fetchIcns(hit.icnsUrl);
       const blob = format === "ico" ? await icnsToIco(buffer) : await icnsToPng(buffer);
       download(blob, filename(hit.appName, format));
       setToast(`${hit.appName} downloaded as ${format.toUpperCase()}.`);
@@ -193,7 +209,7 @@ function App() {
         </button>
         <div className="top-actions">
           <button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
-          <button className="settings-button" onClick={() => { setDraftSearchKey(searchApiKey); setDraftDownloadKey(downloadApiKey); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
+          <button className="settings-button" onClick={() => { setDraftPrimaryKey(primaryApiKey); setDraftBackupKey(backupApiKey); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
         </div>
       </header>
 
@@ -207,7 +223,7 @@ function App() {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
             <button className="search-submit" type="submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
           </form>
-          <div className="hero-meta"><span><ShieldCheck size={15} /> Two separate API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
+          <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
 
         <section className="results-section">
@@ -258,7 +274,7 @@ function App() {
           ) : (
             <div className="empty-state glass">
               <div className="empty-icon"><IconMark /></div><h3>Search 25,000+ macOS icons</h3>
-              <p>Enter an app name above. The search key is used only for search; the download key is used only for original ICNS preview and downloads.</p>
+              <p>Enter an app name above. The primary key is used for search first. If macOSicons rate-limits it, the backup key is used automatically. Preview and downloads fetch the original ICNS asset directly and do not consume search API requests.</p>
               <div className="suggestions">{["Safari", "Finder", "Terminal", "Spotify"].map((item) => <button key={item} onClick={() => setQuery(item)}>{item}</button>)}</div>
             </div>
           )}
@@ -271,13 +287,13 @@ function App() {
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <div className="modal-heading"><div><span className="section-kicker">Local configuration</span><h2 id="settings-title">API access</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="Close settings"><X size={18} /></button></div>
-          <div className="key-card"><div className="key-icon"><KeyRound size={19} /></div><div><strong>Two-key security model</strong><p>Search and original-file requests use different keys. Neither key is sent to an IconFlow server.</p></div></div>
-          <label className="field-label" htmlFor="search-key">Search API key</label>
-          <div className="key-input"><Search size={17} /><input id="search-key" type="password" value={draftSearchKey} onChange={(event) => setDraftSearchKey(event.target.value)} autoComplete="off" placeholder="macOSicons search key" /></div>
-          <label className="field-label" htmlFor="download-key">Download API key</label>
-          <div className="key-input"><Download size={17} /><input id="download-key" type="password" value={draftDownloadKey} onChange={(event) => setDraftDownloadKey(event.target.value)} autoComplete="off" placeholder="macOSicons download key" /></div>
-          <div className="privacy-note"><ShieldCheck size={16} /> Keys are stored locally and sent directly to macOSicons.</div>
-          <div className="modal-actions">{(searchApiKey || downloadApiKey) && <button className="danger-button" onClick={removeKeys}><Trash2 size={15} /> Remove keys</button>}<button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={saveSettings}>Save keys</button></div>
+          <div className="key-card"><div className="key-icon"><KeyRound size={19} /></div><div><strong>Two-key security model</strong><p>The primary key handles search. If it is rate-limited, the backup key handles the search request. Icon files are fetched directly from their asset URL.</p></div></div>
+          <label className="field-label" htmlFor="primary-key">Primary API key</label>
+          <div className="key-input"><Search size={17} /><input id="primary-key" type="password" value={draftPrimaryKey} onChange={(event) => setDraftPrimaryKey(event.target.value)} autoComplete="off" placeholder="macOSicons primary key" /></div>
+          <label className="field-label" htmlFor="backup-key">Backup API key</label>
+          <div className="key-input"><Download size={17} /><input id="backup-key" type="password" value={draftBackupKey} onChange={(event) => setDraftBackupKey(event.target.value)} autoComplete="off" placeholder="macOSicons backup key" /></div>
+          <div className="privacy-note"><ShieldCheck size={16} /> Keys are stored locally in this browser and sent directly to macOSicons only when a search request is made.</div>
+          <div className="modal-actions">{(primaryApiKey || backupApiKey) && <button className="danger-button" onClick={removeKeys}><Trash2 size={15} /> Remove keys</button>}<button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={saveSettings}>Save keys</button></div>
           <p className="modal-footnote">Never put API keys in source code, public issues, screenshots, or chat messages.</p>
         </section>
       </div>}
