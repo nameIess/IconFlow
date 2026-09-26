@@ -274,17 +274,25 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 
 
 .pagination {
+  width: min(620px, 100%);
   min-height: 58px;
-  margin: 24px 0 8px;
+  margin: 24px auto 8px;
   padding: 7px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
   align-items: center;
-  justify-content: center;
   gap: 12px;
   border-radius: 18px;
 }
 .pagination .secondary-button {
-  min-width: 94px;
+  min-width: 118px;
+  min-height: 42px;
+}
+.pagination .secondary-button:first-child {
+  justify-self: end;
+}
+.pagination .secondary-button:last-child {
+  justify-self: start;
 }
 .pagination .secondary-button:disabled {
   opacity: .42;
@@ -292,6 +300,7 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 }
 .pagination-status {
   min-width: 150px;
+  min-height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -299,6 +308,7 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   color: var(--muted);
   font-size: 12px;
   text-align: center;
+  white-space: nowrap;
 }
 .settings-modal .field-label + .key-input {
   margin-bottom: 14px;
@@ -306,14 +316,17 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 
 @media (max-width: 520px) {
   .pagination {
+    grid-template-columns: minmax(82px, 1fr) auto minmax(82px, 1fr);
     gap: 7px;
   }
   .pagination .secondary-button {
     min-width: 82px;
+    min-height: 40px;
     padding: 0 10px;
   }
   .pagination-status {
     min-width: 105px;
+    min-height: 40px;
     font-size: 11px;
   }
 }
