@@ -560,6 +560,20 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
   }
 }
 
+export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
+  if (!isTrustedImageUrl(url)) throw new Error("Blocked untrusted icon source.");
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!isTrustedImageUrl(response.url)) throw new Error("The icon source redirected to an untrusted host.");
+  if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
+
+  const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
+  if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
+  return { buffer, mimeType };
+}
+
 export function isTrustedImageUrl(value?: string): value is string {
   return typeof value === "string" && isTrustedAssetUrl(value);
 }
