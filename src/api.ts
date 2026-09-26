@@ -202,19 +202,25 @@ export function clearSearchCache(): void {
 }
 
 export async function fetchIcns(url: string, downloadApiKey: string): Promise<ArrayBuffer> {
-  const key = downloadApiKey.trim();
-  if (!key) throw new Error("Add your download API key in Settings first.");
+  if (!downloadApiKey.trim()) throw new Error("Add your download API key in Settings first.");
 
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("The icon source URL is invalid."); }
-  if (parsed.protocol !== "https:") throw new Error("Blocked insecure icon source.");
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isMacOSiconsAssetHost =
+    hostname === "s3-new.macosicons.com" ||
+    hostname.endsWith(".macosicons.com");
+
+  if (parsed.protocol !== "https:" || !isMacOSiconsAssetHost) {
+    throw new Error("Blocked untrusted icon source.");
+  }
 
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(parsed.href, {
-      headers: { "x-api-key": key },
       signal: controller.signal,
       cache: "no-store",
     });
