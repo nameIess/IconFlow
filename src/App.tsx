@@ -65,6 +65,10 @@ function App() {
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
