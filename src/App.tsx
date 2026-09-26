@@ -188,6 +188,8 @@ function App() {
       setBackupApiKey(backupKey);
       clearSearchCache();
       requestGeneration.current += 1;
+      setLoading(false);
+      setPageLoading(false);
       setSettingsOpen(false);
       setToast("API keys saved locally in this browser.");
     } catch {
@@ -208,6 +210,8 @@ function App() {
     setDraftBackupKey("");
     clearSearchCache();
     requestGeneration.current += 1;
+    setLoading(false);
+    setPageLoading(false);
     setSettingsOpen(true);
     setToast("Both API keys were removed from this browser.");
   }
@@ -267,7 +271,7 @@ function App() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
 
       <header className="topbar glass">
-        <button className="brand" onClick={() => { requestGeneration.current += 1; setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
+        <button className="brand" onClick={() => { requestGeneration.current += 1; setLoading(false); setPageLoading(false); setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
           <span className="brand-mark"><IconMark /></span><span>IconFlow</span>
         </button>
         <div className="top-actions">
