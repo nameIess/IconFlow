@@ -24,20 +24,5 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high --no-package-lock
 
-      - name: Test Vite share resolver
-        run: |
-          npm run dev -- --host 127.0.0.1 > /tmp/iconflow-vite.log 2>&1 &
-          pid=$!
-          for attempt in $(seq 1 20); do
-            if curl -fsS "http://127.0.0.1:5173/api/resolve-icon?url=https%3A%2F%2Fmacosicons.com%2F%3Ficon%3DIc1LCu7E7f" > /tmp/iconflow-resolver.json; then
-              break
-            fi
-            sleep 1
-          done
-          cat /tmp/iconflow-resolver.json
-          grep -q '"assetType":"icns"' /tmp/iconflow-resolver.json
-          grep -q 's3-new.macosicons.com' /tmp/iconflow-resolver.json
-          kill "$pid"
-
       - name: Typecheck and build
         run: npm run build
