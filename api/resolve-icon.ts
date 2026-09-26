@@ -39,6 +39,7 @@ function cleanUrl(value: string, base: string): string | null {
   const decoded = value
     .replaceAll("&amp;", "&")
     .replaceAll("\\/", "/")
+    .replaceAll("\\u002F", "/")
     .trim();
 
   try {
@@ -54,6 +55,7 @@ function findAsset(html: string, base: string): string | null {
   // slashes as "\/". Normalize those escapes before looking for asset URLs.
   const normalized = html
     .replaceAll("\\/", "/")
+    .replaceAll("\\u002F", "/")
     .replaceAll("&amp;", "&");
 
   const candidates: string[] = [];
