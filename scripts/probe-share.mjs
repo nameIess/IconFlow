@@ -7,20 +7,41 @@ const response = await fetch(url, {
   redirect: "follow",
 });
 const body = await response.text();
-const interestingLines = body
-  .split(/\r?\n/u)
-  .filter((line) => /s3-new\.macosicons\.com|\.icns(?:[?#"'\s]|$)/iu.test(line))
-  .slice(0, 20);
+const normalized = body.replaceAll("\\/", "/");
+const icnsMatch = normalized.match(/"icnsUrl"\s*:\s*"([^"]+\.icns(?:[?#][^"]*)?)"/iu);
+if (!response.ok || !icnsMatch) {
+  console.error(JSON.stringify({
+    status: response.status,
+    finalUrl: response.url,
+    contentType: response.headers.get("content-type"),
+    length: body.length,
+    title: body.match(/<title[^>]*>([^<]+)<\/title>/iu)?.[1] || null,
+    hasIcnsUrl: Boolean(icnsMatch),
+  }, null, 2));
+  process.exit(1);
+}
+
+const icnsUrl = icnsMatch[1];
+const asset = await fetch(icnsUrl, {
+  headers: { "User-Agent": "IconFlow/3 macOSicons importer" },
+  redirect: "error",
+});
+const bytes = new Uint8Array(await asset.arrayBuffer());
+const declaredLength = bytes.length >= 8
+  ? new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4)
+  : 0;
+const magic = new TextDecoder().decode(bytes.slice(0, 4));
 
 console.log(JSON.stringify({
-  status: response.status,
-  finalUrl: response.url,
-  contentType: response.headers.get("content-type"),
-  length: body.length,
-  hasIcns: /\.icns(?:[?#"'\s]|$)/iu.test(body),
-  hasMacosiconsAsset: body.includes("s3-new.macosicons.com"),
-  title: body.match(/<title[^>]*>([^<]+)<\/title>/iu)?.[1] || null,
-  interestingLines,
+  pageStatus: response.status,
+  pageTitle: body.match(/<title[^>]*>([^<]+)<\/title>/iu)?.[1] || null,
+  icnsUrl,
+  assetStatus: asset.status,
+  assetType: asset.headers.get("content-type"),
+  assetBytes: bytes.length,
+  magic,
+  declaredLength,
+  validIcns: magic === "icns" && declaredLength === bytes.length,
 }, null, 2));
 
-if (!response.ok) process.exit(1);
+if (!asset.ok || magic !== "icns" || declaredLength !== bytes.length) process.exit(1);
