@@ -19,3 +19,5 @@ console.log(JSON.stringify({
   title: text.match(/<title[^>]*>([^<]+)<\\/title>/i)?.[1] || null,
 }, null, 2));
 if (!response.ok) process.exit(1);
+
+// CI probe intentionally targets the supplied share URL.
