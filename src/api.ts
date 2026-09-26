@@ -25,7 +25,7 @@ const API_BASE = "https://api.macosicons.com/api/v1";
 export const SEARCH_PAGE_SIZE = 50;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MIN_SEARCH_INTERVAL_MS = 550;
-const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SEARCH_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const PERSISTED_CACHE_KEY = "iconflow.searchCache.v2";
 const MAX_PERSISTED_CACHE_ENTRIES = 20;
 
