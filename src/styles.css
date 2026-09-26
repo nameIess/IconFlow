@@ -271,3 +271,49 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   .download-button { padding: 6px 7px; }
   .hero-meta span:last-child { display: none; }
 }
+
+
+.pagination {
+  min-height: 58px;
+  margin: 24px 0 8px;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 18px;
+}
+.pagination .secondary-button {
+  min-width: 94px;
+}
+.pagination .secondary-button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+.pagination-status {
+  min-width: 150px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.settings-modal .field-label + .key-input {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 520px) {
+  .pagination {
+    gap: 7px;
+  }
+  .pagination .secondary-button {
+    min-width: 82px;
+    padding: 0 10px;
+  }
+  .pagination-status {
+    min-width: 105px;
+    font-size: 11px;
+  }
+}
