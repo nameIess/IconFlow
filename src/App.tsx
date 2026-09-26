@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
-import { clearSearchCache, fetchIcns, isTrustedImageUrl, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
+import { ChevronDown, Download, ExternalLink, FileText, KeyRound, Link2, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, Upload, X } from "lucide-react";
+import { clearSearchCache, fetchIcns, importIconUrls, isTrustedImageUrl, MAX_IMPORT_URLS, parseIconImportUrls, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -108,6 +108,66 @@ function App() {
     setActiveQuery(searchValue);
     setFormatById({});
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+
+  async function applyImportedUrls(urls: string[], sourceLabel: string) {
+    if (!urls.length) return setToast("No supported macOSicons or ICNS URLs found.");
+
+    const generation = ++requestGeneration.current;
+    setImportLoading(true);
+    setMenuId(null);
+
+    try {
+      const data = await importIconUrls(primaryApiKey, backupApiKey, urls);
+      if (generation !== requestGeneration.current) return;
+
+      const imported = mergeUniqueHits([], data.hits);
+      setResults(imported);
+      setTotal(imported.length);
+      setPage(1);
+      setTotalPages(1);
+      setActiveQuery(`Imported from ${sourceLabel}`);
+      setFormatById({});
+      setImportOpen(false);
+      setImportUrl("");
+
+      if (data.usedBackup) {
+        setToast(`Imported ${imported.length} icon(s). Primary API key was rate-limited; backup was used.`);
+      } else if (data.failed.length) {
+        setToast(`Imported ${imported.length} icon(s); ${data.failed.length} link(s) could not be resolved.`);
+      } else {
+        setToast(`Imported ${imported.length} icon(s).`);
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      if (generation !== requestGeneration.current) return;
+      setToast(error instanceof Error ? error.message : "Icon import failed.");
+    } finally {
+      if (generation === requestGeneration.current) setImportLoading(false);
+    }
+  }
+
+  async function importFromUrl() {
+    const { urls } = parseIconImportUrls(importUrl);
+    if (!urls.length) return setToast("Paste a macOSicons icon URL or a direct .icns URL.");
+    await applyImportedUrls(urls, "URL");
+  }
+
+  async function importFromFile(file: File) {
+    if (file.size > 2 * 1024 * 1024) return setToast("Text files are limited to 2 MB.");
+    if (!/\.txt$/i.test(file.name) && file.type !== "text/plain") {
+      return setToast("Choose a .txt file containing icon URLs.");
+    }
+
+    try {
+      const text = await file.text();
+      const { urls } = parseIconImportUrls(text);
+      await applyImportedUrls(urls, file.name);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to read the text file.");
+    }
   }
 
   async function search() {
@@ -285,11 +345,18 @@ function App() {
           <div className="eyebrow"><span className="status-dot" /> Browser-native icon workflow</div>
           <h1>Find the icon.<br /><span>Make it yours.</span></h1>
           <p>Search macOS icons in fixed 50-result pages, then preview or convert the original ICNS locally into PNG or Windows-ready ICO.</p>
-          <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-            <Search size={20} className="search-leading" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
-            <button className="search-submit" type="submit" disabled={loading || pageLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
-          </form>
+          <div className="search-stack">
+            <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
+              <Search size={20} className="search-leading" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
+              <button className="search-submit" type="submit" disabled={loading || pageLoading || importLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
+            </form>
+            <div className="import-actions">
+              <button type="button" className="import-button glass" onClick={() => setImportOpen(true)} disabled={loading || pageLoading || importLoading}><Link2 size={15} /> Import icon URL</button>
+              <button type="button" className="import-button glass" onClick={() => fileInputRef.current?.click()} disabled={loading || pageLoading || importLoading}><Upload size={15} /> Import .txt file</button>
+              <input ref={fileInputRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void importFromFile(file); }} />
+            </div>
+          </div>
           <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
 
@@ -354,6 +421,18 @@ function App() {
 
       <footer><span>IconFlow</span><span>Icons and creator attribution provided by macOSicons.</span><a href="https://macosicons.com" target="_blank" rel="noopener noreferrer">macOSicons <ExternalLink size={12} /></a></footer>
       {toast && <div className="toast glass" role="status">{toast}</div>}
+
+      {importOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !importLoading) setImportOpen(false); }}>
+        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="import-title">
+          <div className="modal-heading"><div><span className="section-kicker">Icon import</span><h2 id="import-title">Import icon links</h2></div><button className="icon-button" onClick={() => setImportOpen(false)} disabled={importLoading} aria-label="Close import dialog"><X size={18} /></button></div>
+          <div className="key-card"><div className="key-icon"><FileText size={19} /></div><div><strong>Use a macOSicons share link</strong><p>Paste a URL such as https://macosicons.com/?icon=Ic1LCu7E7f or upload a .txt file containing one or more icon links.</p></div></div>
+          <label className="field-label" htmlFor="import-url">Icon URL</label>
+          <div className="key-input"><Link2 size={17} /><input id="import-url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} autoComplete="off" placeholder="https://macosicons.com/?icon=..." /></div>
+          <div className="import-or">or choose a .txt file with one or more icon links</div>
+          <div className="import-file-row"><button className="secondary-button" onClick={() => fileInputRef.current?.click()} disabled={importLoading}><Upload size={15} /> Choose .txt file</button><span>Up to {MAX_IMPORT_URLS} links</span></div>
+          <div className="modal-actions"><button className="secondary-button" onClick={() => setImportOpen(false)} disabled={importLoading}>Cancel</button><button className="primary-button" onClick={() => void importFromUrl()} disabled={importLoading || !importUrl.trim()}>{importLoading ? <LoaderCircle className="spin" size={15} /> : <Link2 size={15} />} {importLoading ? "Importing…" : "Import links"}</button></div>
+        </section>
+      </div>}
 
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">
