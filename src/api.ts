@@ -355,7 +355,7 @@ export type ImportedIconResult = {
 };
 
 function cleanImportedUrl(value: string): string {
-  return value.trim().replace(/^["'(<\[]+/, "").replace(/["')>\],.;:]+$/, "");
+  return value.trim().replace(/^[\"'( <\[]+/, "").replace(/[\"')>\],.;:]+$/, "");
 }
 
 function parseUrlCandidate(value: string): URL | null {
@@ -373,8 +373,7 @@ function normalizedImportUrl(value: string): string | null {
   const host = url.hostname.toLowerCase();
 
   if (host === MACOSICONS_HOST || host === MACOSICONS_WWW_HOST) {
-    const iconId = url.searchParams.get("icon")?.trim();
-    return iconId ? url.toString() : null;
+    return url.searchParams.get("icon")?.trim() ? url.toString() : null;
   }
 
   if (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
@@ -433,7 +432,7 @@ export function parseIconImportUrls(text: string): { urls: string[]; invalidCoun
 
   return {
     urls,
-    invalidCount: lines.filter((line) => line.trim()).length - urls.length,
+    invalidCount: Math.max(0, lines.filter((line) => line.trim()).length - urls.length),
   };
 }
 
@@ -492,7 +491,7 @@ export async function importIconUrls(
 
       const ranked = data.hits
         .map((hit) => ({ hit, score: scoreImportedHit(hit, iconId) }))
-        .sort((x, y) => y.score - x.score);
+        .sort((a, b) => b.score - a.score);
 
       hits.push(ranked[0].hit);
     } catch {
