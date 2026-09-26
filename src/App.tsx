@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
-import { clearSearchCache, fetchIcns, isTrustedImageUrl, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
+import { clearSearchCache, fetchIcns, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -66,6 +66,10 @@ function App() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
 
@@ -131,6 +135,64 @@ function App() {
       setToast(error instanceof Error ? error.message : "Search failed.");
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
+    }
+  }
+
+  async function importUrls(urls: string[]) {
+    if (!primaryApiKey) {
+      setImportOpen(false);
+      setSettingsOpen(true);
+      setToast("Add your primary API key first.");
+      return;
+    }
+
+    setImportLoading(true);
+    try {
+      const data = await importIconUrls(primaryApiKey, backupApiKey, urls);
+      if (data.hits.length) {
+        setResults((current) => mergeUniqueHits(current, data.hits));
+        setTotal((current) => current + data.hits.length);
+        setActiveQuery("Imported icons");
+        setPage(1);
+        setTotalPages(1);
+        setFormatById({});
+        setImportOpen(false);
+
+        const failedText = data.failed.length ? \` \${data.failed.length} link(s) could not be resolved.\` : "";
+        const backupText = data.usedBackup ? " Backup API key was used." : "";
+        setToast(\`Imported \${data.hits.length} icon(s).\${failedText}\${backupText}\`);
+      } else {
+        setToast(data.failed.length ? \`Imported 0 icon(s); \${data.failed.length} link(s) could not be resolved.\` : "No supported icon links were found.");
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Icon import failed.");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function importFromText() {
+    const parsed = parseIconImportText(importUrl);
+    if (!parsed.urls.length) {
+      setToast("Paste a macOSicons URL or supported ICNS URL.");
+      return;
+    }
+    await importUrls(parsed.urls);
+  }
+
+  async function importFromFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = parseIconImportText(text);
+      if (!parsed.urls.length) {
+        setToast("The text file contains no supported icon URLs.");
+        return;
+      }
+      await importUrls(parsed.urls);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to read the text file.");
+    } finally {
+      if (importFileRef.current) importFileRef.current.value = "";
     }
   }
 
@@ -277,6 +339,7 @@ function App() {
         <div className="top-actions">
           <button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="settings-button" onClick={() => { setDraftPrimaryKey(primaryApiKey); setDraftBackupKey(backupApiKey); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
+          <button className="settings-button" onClick={() => setImportOpen(true)}><Download size={16} /><span>Import</span></button>
         </div>
       </header>
 
@@ -354,6 +417,23 @@ function App() {
 
       <footer><span>IconFlow</span><span>Icons and creator attribution provided by macOSicons.</span><a href="https://macosicons.com" target="_blank" rel="noopener noreferrer">macOSicons <ExternalLink size={12} /></a></footer>
       {toast && <div className="toast glass" role="status">{toast}</div>}
+
+      {importOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !importLoading) setImportOpen(false); }}>
+        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="import-title">
+          <div className="modal-heading">
+            <div><span className="section-kicker">Import icons</span><h2 id="import-title">URL or text file</h2></div>
+            <button className="icon-button" disabled={importLoading} onClick={() => setImportOpen(false)} aria-label="Close import"><X size={18} /></button>
+          </div>
+          <p>Paste one macOSicons share URL or upload a .txt file containing icon URLs. Up to 100 links are imported and duplicates are ignored.</p>
+          <label className="field-label" htmlFor="import-url">Icon URL</label>
+          <div className="key-input"><ExternalLink size={17} /><input id="import-url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://macosicons.com/?icon=Ic1LCu7E7f" disabled={importLoading} /></div>
+          <div className="modal-actions">
+            <button className="secondary-button" disabled={importLoading} onClick={() => importFileRef.current?.click()}>Choose .txt file</button>
+            <input ref={importFileRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFromFile(file); }} />
+            <button className="primary-button" disabled={importLoading || !importUrl.trim()} onClick={() => void importFromText()}>{importLoading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />} {importLoading ? "Importing…" : "Import URL"}</button>
+          </div>
+        </section>
+      </div>}
 
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">
