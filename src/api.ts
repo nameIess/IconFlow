@@ -227,7 +227,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
 
     const responsePage = positiveInteger(result.page) ?? page;
     const responseOffset = nonNegativeInteger(result.offset) ?? (page - 1) * SEARCH_PAGE_SIZE;
-    const responseHitsPerPage = positiveInteger(result.hitsPerPage) ?? SEARCH_PAGE_SIZE;
+    const responseHitsPerPage = positiveInteger(result.hitsPerPage) ?? positiveInteger(result.limit) ?? SEARCH_PAGE_SIZE;
 
     if (
       responsePage !== page ||
