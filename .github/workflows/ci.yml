@@ -19,7 +19,10 @@ jobs:
           node-version: "20"
 
       - name: Install
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm install --ignore-scripts --no-fund
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high --no-package-lock
 
       - name: Typecheck and build
         run: npm run build
