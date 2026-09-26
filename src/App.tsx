@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
-import { clearSearchCache, fetchIcns, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
+import { clearSearchCache, fetchIcns, isTrustedImageUrl, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
@@ -28,6 +28,24 @@ function IconMark({ className = "" }: { className?: string }) {
   return <img className={className} src="/favicon.svg" alt="" aria-hidden="true" />;
 }
 
+function hitId(hit: IconHit, index = 0): string {
+  return hit.objectID || hit.icnsUrl || `${hit.appName}-${index}`;
+}
+
+function mergeUniqueHits(current: IconHit[], next: IconHit[]): IconHit[] {
+  const seen = new Set<string>();
+  const merged: IconHit[] = [];
+
+  for (const hit of [...current, ...next]) {
+    const id = hit.objectID || hit.icnsUrl || `${hit.appName}-${merged.length}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    merged.push(hit);
+  }
+
+  return merged;
+}
+
 function App() {
   const [primaryApiKey, setPrimaryApiKey] = useState(() => storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY));
   const [backupApiKey, setBackupApiKey] = useState(() => storedWithLegacy(BACKUP_KEY, LEGACY_DOWNLOAD_KEY));
@@ -48,6 +66,7 @@ function App() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
+  const requestGeneration = useRef(0);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -74,11 +93,18 @@ function App() {
     };
   }, [menuId]);
 
-  function applyResponse(data: Awaited<ReturnType<typeof searchIcons>>) {
+  useEffect(() => {
+    return () => {
+      if (preview?.url) URL.revokeObjectURL(preview.url);
+    };
+  }, [preview?.url]);
+
+  function applyResponse(data: Awaited<ReturnType<typeof searchIcons>>, searchValue: string) {
     setResults(data.hits);
     setTotal(data.totalHits);
     setPage(data.page);
     setTotalPages(data.totalPages);
+    setActiveQuery(searchValue);
     setFormatById({});
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -88,49 +114,63 @@ function App() {
     if (!value) return setToast("Enter an icon name to search.");
     if (!primaryApiKey) return setSettingsOpen(true);
 
+    const generation = ++requestGeneration.current;
     setLoading(true);
-    setActiveQuery(value);
-    setResults([]);
-    setPage(1);
-    setTotal(0);
-    setTotalPages(1);
     setMenuId(null);
 
     try {
       const data = await searchIcons(primaryApiKey, backupApiKey, value, 1);
-      if (data.page !== 1 || data.offset !== 0 || data.hitsPerPage !== SEARCH_PAGE_SIZE) {
-        throw new Error("The search API did not return the required 50-result first page.");
-      }
-      applyResponse(data);
+      if (generation !== requestGeneration.current) return;
+
+      applyResponse(data, value);
       if (data.usedBackup) setToast("Primary API key is rate-limited. Search continued with the backup key.");
       else if (!data.hits.length) setToast("No icons found. Try another search.");
     } catch (error) {
+      if (generation !== requestGeneration.current) return;
       setToast(error instanceof Error ? error.message : "Search failed.");
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }
 
-  async function goToPage(nextPage: number) {
-    if (loading || pageLoading || !activeQuery || nextPage < 1 || nextPage > totalPages || nextPage === page) return;
+  async function loadMore() {
+    if (loading || pageLoading || !activeQuery || page >= totalPages) return;
+
+    const generation = ++requestGeneration.current;
+    const nextPage = page + 1;
     setPageLoading(true);
     setMenuId(null);
 
     try {
       const data = await searchIcons(primaryApiKey, backupApiKey, activeQuery, nextPage);
-      const expectedOffset = (nextPage - 1) * SEARCH_PAGE_SIZE;
+      if (generation !== requestGeneration.current) return;
 
+      const expectedOffset = (nextPage - 1) * SEARCH_PAGE_SIZE;
       if (data.page !== nextPage || data.offset !== expectedOffset || data.hitsPerPage !== SEARCH_PAGE_SIZE) {
-        setToast("The API returned an unexpected page. Current icons were kept and no retry was made.");
+        setToast(
+          `The API returned an unexpected page. Expected page ${nextPage}, offset ${expectedOffset}, and ${SEARCH_PAGE_SIZE} results per page.`,
+        );
         return;
       }
 
-      applyResponse(data);
+      if (!data.hits.length) {
+        setToast("No more icons were returned.");
+        setPage(data.page);
+        setTotal(data.totalHits);
+        setTotalPages(data.totalPages);
+        return;
+      }
+
+      setResults((current) => mergeUniqueHits(current, data.hits));
+      setTotal(data.totalHits);
+      setPage(data.page);
+      setTotalPages(data.totalPages);
       if (data.usedBackup) setToast("Primary API key is rate-limited. Search continued with the backup key.");
     } catch (error) {
-      setToast(error instanceof Error ? error.message : "Unable to load that page.");
+      if (generation !== requestGeneration.current) return;
+      setToast(error instanceof Error ? error.message : "Unable to load more icons.");
     } finally {
-      setPageLoading(false);
+      if (generation === requestGeneration.current) setPageLoading(false);
     }
   }
 
@@ -145,6 +185,8 @@ function App() {
       localStorage.removeItem(LEGACY_DOWNLOAD_KEY);
       setPrimaryApiKey(primaryKey);
       setBackupApiKey(backupKey);
+      clearSearchCache();
+      requestGeneration.current += 1;
       setSettingsOpen(false);
       setToast("API keys saved locally in this browser.");
     } catch {
@@ -153,13 +195,18 @@ function App() {
   }
 
   function removeKeys() {
-    try { localStorage.removeItem(PRIMARY_KEY); localStorage.removeItem(BACKUP_KEY);
-    localStorage.removeItem(LEGACY_SEARCH_KEY); localStorage.removeItem(LEGACY_DOWNLOAD_KEY); } catch {}
+    try {
+      localStorage.removeItem(PRIMARY_KEY);
+      localStorage.removeItem(BACKUP_KEY);
+      localStorage.removeItem(LEGACY_SEARCH_KEY);
+      localStorage.removeItem(LEGACY_DOWNLOAD_KEY);
+    } catch {}
     setPrimaryApiKey("");
     setBackupApiKey("");
     setDraftPrimaryKey("");
     setDraftBackupKey("");
     clearSearchCache();
+    requestGeneration.current += 1;
     setSettingsOpen(true);
     setToast("Both API keys were removed from this browser.");
   }
@@ -171,11 +218,26 @@ function App() {
 
   async function openPreview(hit: IconHit) {
     if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
+
+    const previousUrl = preview?.url;
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+
+    const generation = ++requestGeneration.current;
     setPreview({ hit, loading: true });
+
     try {
       const buffer = await fetchIcns(hit.icnsUrl);
-      setPreview({ hit, url: await previewUrl(buffer), loading: false });
+      if (generation !== requestGeneration.current) return;
+
+      const url = await previewUrl(buffer);
+      if (generation !== requestGeneration.current) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      setPreview({ hit, url, loading: false });
     } catch (error) {
+      if (generation !== requestGeneration.current) return;
       setPreview({ hit, loading: false });
       setToast(error instanceof Error ? error.message : "Unable to preview the icon.");
     }
@@ -204,7 +266,7 @@ function App() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
 
       <header className="topbar glass">
-        <button className="brand" onClick={() => { setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
+        <button className="brand" onClick={() => { requestGeneration.current += 1; setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
           <span className="brand-mark"><IconMark /></span><span>IconFlow</span>
         </button>
         <div className="top-actions">
@@ -221,7 +283,7 @@ function App() {
           <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
             <Search size={20} className="search-leading" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
-            <button className="search-submit" type="submit" disabled={loading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
+            <button className="search-submit" type="submit" disabled={loading || pageLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
           </form>
           <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
@@ -229,22 +291,24 @@ function App() {
         <section className="results-section">
           <div className="results-header">
             <div><span className="section-kicker">{results.length ? "Search results" : "Explore"}</span><h2>{results.length ? activeQuery : "Your icon shelf"}</h2></div>
-            {results.length > 0 && <span className="result-count">{((page - 1) * SEARCH_PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * SEARCH_PAGE_SIZE, total).toLocaleString()} of {total.toLocaleString()}</span>}
+            {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} loaded</span>}
           </div>
 
-          {loading ? (
+          {loading && !results.length ? (
             <div className="skeleton-grid">{Array.from({ length: 8 }, (_, i) => <div className="skeleton-card glass" key={i} />)}</div>
           ) : results.length ? (
             <>
               <div className="icon-grid">
                 {results.map((hit, index) => {
-                  const id = hit.objectID || hit.icnsUrl || `${hit.appName}-${index}`;
+                  const id = hitId(hit, index);
                   const format = formatById[id] || "ico";
                   const busy = busyId === id;
+                  const imageUrl = isTrustedImageUrl(hit.lowResPngUrl) ? hit.lowResPngUrl : undefined;
+
                   return (
                     <article className="icon-card glass" key={id}>
                       <button className="preview-button" onClick={() => void openPreview(hit)} aria-label={`Preview ${hit.appName}`}>
-                        <div className="icon-art">{hit.lowResPngUrl ? <img src={hit.lowResPngUrl} alt="" loading="lazy" /> : <IconMark className="fallback-icon" />}</div>
+                        <div className="icon-art">{imageUrl ? <img src={imageUrl} alt="" loading="lazy" decoding="async" /> : <IconMark className="fallback-icon" />}</div>
                         <span className="preview-hint">Preview ICNS</span>
                       </button>
                       <div className="card-body">
@@ -265,11 +329,13 @@ function App() {
                 })}
               </div>
 
-              {totalPages > 1 && <nav className="pagination glass" aria-label="Search result pages">
-                <button className="secondary-button" disabled={pageLoading || page <= 1} onClick={() => void goToPage(page - 1)}>Previous</button>
-                <span className="pagination-status">{pageLoading && <LoaderCircle className="spin" size={16} />} Page {page} of {totalPages}</span>
-                <button className="secondary-button" disabled={pageLoading || page >= totalPages} onClick={() => void goToPage(page + 1)}>Next</button>
-              </nav>}
+              {totalPages > page && <div className="pagination glass">
+                <button className="primary-button" disabled={pageLoading || loading} onClick={() => void loadMore()}>
+                  {pageLoading ? <LoaderCircle className="spin" size={16} /> : <ChevronDown size={16} />}
+                  {pageLoading ? "Loading…" : `Load more icons (${Math.min(SEARCH_PAGE_SIZE, Math.max(0, total - results.length))})`}
+                </button>
+                <span className="pagination-status">Loaded {results.length.toLocaleString()} of {total.toLocaleString()}</span>
+              </div>}
             </>
           ) : (
             <div className="empty-state glass">
