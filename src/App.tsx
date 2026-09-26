@@ -73,6 +73,7 @@ function App() {
   const [importUrl, setImportUrl] = useState("");
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+  const importModalFileRef = useRef<HTMLInputElement>(null);
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
 
@@ -557,8 +558,8 @@ function App() {
           <label className="field-label" htmlFor="import-url">Icon URL</label>
           <div className="key-input"><ExternalLink size={17} /><input id="import-url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://macosicons.com/?icon=Ic1LCu7E7f" disabled={importLoading} /></div>
           <div className="modal-actions">
-            <button className="secondary-button" disabled={importLoading} onClick={() => importFileRef.current?.click()}>Choose .txt file</button>
-            <input ref={importFileRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFromFile(file); }} />
+            <button className="secondary-button" disabled={importLoading} onClick={() => importModalFileRef.current?.click()}>Choose .txt file</button>
+            <input ref={importModalFileRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void importFromFile(file); }} />
             <button className="primary-button" disabled={importLoading || !importUrl.trim()} onClick={() => void importFromText()}>{importLoading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />} {importLoading ? "Importing…" : "Import URL"}</button>
           </div>
         </section>
