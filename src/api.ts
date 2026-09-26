@@ -188,7 +188,12 @@ function nonNegativeInteger(value: unknown): number | null {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
-async function requestSearch(apiKey: string, query: string, page: number): Promise<SearchResponse> {
+async function requestSearch(
+  apiKey: string,
+  query: string,
+  page: number,
+  filters?: string[],
+): Promise<SearchResponse> {
   await waitForSearchSlot();
 
   const controller = new AbortController();
@@ -208,6 +213,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
           hitsPerPage: SEARCH_PAGE_SIZE,
           page,
           offset: (page - 1) * SEARCH_PAGE_SIZE,
+          ...(filters?.length ? { filters } : {}),
         },
       }),
       signal: controller.signal,
@@ -272,12 +278,17 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
   }
 }
 
-async function requestWithKey(apiKey: string, query: string, page: number): Promise<SearchResponse> {
+async function requestWithKey(
+  apiKey: string,
+  query: string,
+  page: number,
+  filters?: string[],
+): Promise<SearchResponse> {
   const limitedUntil = rateLimitedUntil.get(apiKey) ?? 0;
   if (Date.now() < limitedUntil) throw new RateLimitError();
 
   try {
-    return await requestSearch(apiKey, query, page);
+    return await requestSearch(apiKey, query, page, filters);
   } catch (error) {
     if (error instanceof RateLimitError) {
       rateLimitedUntil.set(apiKey, Date.now() + RATE_LIMIT_COOLDOWN_MS);
@@ -345,6 +356,34 @@ export async function searchIcons(
 
   inFlight.set(inFlightKey, request);
   return request;
+}
+
+
+async function searchIconById(
+  primaryApiKey: string,
+  backupApiKey: string,
+  iconId: string,
+): Promise<SearchResult> {
+  const normalizedId = iconId.trim();
+  if (!normalizedId) throw new Error("Icon ID is required.");
+
+  const primaryKey = primaryApiKey.trim();
+  const backupKey = backupApiKey.trim();
+  if (!primaryKey) throw new Error("Add your primary API key in Settings first.");
+
+  const filters = [`objectID = "${normalizedId.replace(/"/g, '\\\\"')}"`];
+
+  const run = async (apiKey: string): Promise<SearchResult> => ({
+    ...(await requestWithKey(apiKey, normalizedId, 1, filters)),
+    usedBackup: apiKey === backupKey && backupKey !== primaryKey,
+  });
+
+  try {
+    return await run(primaryKey);
+  } catch (error) {
+    if (!(error instanceof RateLimitError) || !backupKey || backupKey === primaryKey) throw error;
+    return run(backupKey);
+  }
 }
 
 
@@ -481,7 +520,7 @@ export async function importIconUrls(
     }
 
     try {
-      const data = await searchIcons(primaryApiKey, backupApiKey, iconId, 1);
+      const data = await searchIconById(primaryApiKey, backupApiKey, iconId);
       usedBackup = usedBackup || data.usedBackup;
 
       if (!data.hits.length) {
