@@ -5,7 +5,13 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024;
 function isAllowedShareUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && ALLOWED_HOSTS.has(url.hostname.toLowerCase());
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      ALLOWED_HOSTS.has(url.hostname.toLowerCase())
+    );
   } catch {
     return false;
   }
@@ -14,7 +20,15 @@ function isAllowedShareUrl(value: string): boolean {
 function isAssetUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || !ASSET_HOSTS.has(url.hostname.toLowerCase())) return false;
+    if (
+      url.protocol !== "https:" ||
+      !ASSET_HOSTS.has(url.hostname.toLowerCase()) ||
+      url.username ||
+      url.password ||
+      url.port
+    ) {
+      return false;
+    }
     return /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname);
   } catch {
     return false;
@@ -22,7 +36,11 @@ function isAssetUrl(value: string): boolean {
 }
 
 function cleanUrl(value: string, base: string): string | null {
-  const decoded = value.replaceAll("&amp;", "&").replaceAll("\\/", "/");
+  const decoded = value
+    .replaceAll("&amp;", "&")
+    .replaceAll("\\/", "/")
+    .trim();
+
   try {
     const url = new URL(decoded, base);
     return isAssetUrl(url.toString()) ? url.toString() : null;
@@ -32,14 +50,21 @@ function cleanUrl(value: string, base: string): string | null {
 }
 
 function findAsset(html: string, base: string): string | null {
+  // Nuxt serializes the icon record as JSON inside __NUXT_DATA__ and escapes
+  // slashes as "\/". Normalize those escapes before looking for asset URLs.
+  const normalized = html
+    .replaceAll("\\/", "/")
+    .replaceAll("&amp;", "&");
+
   const candidates: string[] = [];
   const patterns = [
+    /"icnsUrl"\s*:\s*"([^"]+)"/gi,
     /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi,
     /https?:\/\/[^\s"'<>\\]+/gi,
   ];
 
   for (const pattern of patterns) {
-    for (const match of html.matchAll(pattern)) {
+    for (const match of normalized.matchAll(pattern)) {
       const value = match[1] ?? match[0];
       const url = cleanUrl(value, base);
       if (url) candidates.push(url);
@@ -64,7 +89,10 @@ export default async function handler(req: any, res: any) {
 
   try {
     const response = await fetch(raw, {
-      headers: { Accept: "text/html,application/xhtml+xml" },
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "IconFlow/3 macOSicons importer",
+      },
       redirect: "follow",
     });
 
@@ -76,6 +104,12 @@ export default async function handler(req: any, res: any) {
 
     if (contentType.startsWith("image/") && isAssetUrl(response.url)) {
       res.status(200).json({ assetUrl: response.url, assetType: contentType.split("/")[1] });
+      return;
+    }
+
+    // Never accept an HTML response after a redirect to an unrelated host.
+    if (!isAllowedShareUrl(response.url || raw)) {
+      res.status(502).json({ error: "macOSicons redirected to an untrusted host." });
       return;
     }
 
