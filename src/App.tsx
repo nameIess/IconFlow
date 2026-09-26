@@ -442,15 +442,31 @@ function App() {
           <div className="eyebrow"><span className="status-dot" /> Browser-native icon workflow</div>
           <h1>Find the icon.<br /><span>Make it yours.</span></h1>
           <p>Search macOS icons in fixed 50-result pages, then preview or convert the original ICNS locally into PNG or Windows-ready ICO.</p>
-          <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-            <Search size={20} className="search-leading" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
-            <button className="search-submit" type="submit" disabled={loading || pageLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
-          </form>
-          <div className="import-actions">
-            <button className="import-button" onClick={() => setImportOpen(true)} disabled={importLoading}>
-              <Download size={15} /> Import icons from URL or TXT
-            </button>
+          <div className="search-stack">
+            <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
+              <Search size={20} className="search-leading" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
+              <button className="search-submit" type="submit" disabled={loading || pageLoading || importLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
+            </form>
+            <div className="import-actions">
+              <button type="button" className="import-button glass" onClick={() => setImportOpen(true)} disabled={loading || pageLoading || importLoading}>
+                <Link2 size={15} /> Import icon URL
+              </button>
+              <button type="button" className="import-button glass" onClick={() => importFileRef.current?.click()} disabled={loading || pageLoading || importLoading}>
+                <Upload size={15} /> Import .txt file
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".txt,text/plain"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) void importFromFile(file);
+                }}
+              />
+            </div>
           </div>
           <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
