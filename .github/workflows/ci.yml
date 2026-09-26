@@ -24,9 +24,6 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high --no-package-lock
 
-      - name: Debug share resolver extraction
-        run: node scripts/debug-resolver.mjs
-
       - name: Test Vite share preview resolver
         run: |
           npm run dev -- --host 127.0.0.1 > /tmp/iconflow-vite.log 2>&1 &
