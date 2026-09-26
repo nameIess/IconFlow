@@ -35,7 +35,7 @@ function findAsset(html: string, base: string): string | null {
   const candidates: string[] = [];
   const patterns = [
     /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi,
-    /https?:\\/\\/[^\s"'<>\\]+/gi,
+    /https?:\/\/[^\s"'<>\\]+/gi,
   ];
 
   for (const pattern of patterns) {
