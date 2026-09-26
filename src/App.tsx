@@ -369,7 +369,7 @@ function App() {
         </section>
       </div>}
 
-      {preview && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
+      {preview && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { previewGeneration.current += 1; setPreview(null); } }}>
         <section className="preview-modal glass" role="dialog" aria-modal="true" aria-labelledby="preview-title">
           <div className="modal-heading"><div><span className="section-kicker">Original ICNS</span><h2 id="preview-title">{preview.hit.appName}</h2></div><button className="icon-button" onClick={() => { previewGeneration.current += 1; setPreview(null); }} aria-label="Close preview"><X size={18} /></button></div>
           <div className="large-preview">{preview.loading ? <LoaderCircle className="spin" size={28} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <IconMark className="preview-fallback-icon" />}</div>
