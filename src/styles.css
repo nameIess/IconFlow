@@ -330,3 +330,28 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 .import-file-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--muted-2); font-size: 10px; }
 .import-file-row .secondary-button { min-height: 38px; }
 @media (max-width: 520px) { .import-actions { flex-direction: column; } .import-button { justify-content: center; width: 100%; } .import-file-row { align-items: stretch; flex-direction: column; } }
+
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 14px;
+}
+.selection-bar > span { margin-right: auto; font-weight: 700; }
+.icon-card.selected { outline: 2px solid var(--accent, currentColor); }
+.select-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 8px;
+}
+.select-icon input {
+  width: 16px;
+  height: 16px;
+  accent-color: currentColor;
+  cursor: pointer;
+}
