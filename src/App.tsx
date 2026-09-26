@@ -129,7 +129,6 @@ function App() {
       if (downloadKey) localStorage.setItem(DOWNLOAD_KEY, downloadKey); else localStorage.removeItem(DOWNLOAD_KEY);
       setSearchApiKey(searchKey);
       setDownloadApiKey(downloadKey);
-      clearSearchCache();
       setSettingsOpen(false);
       setToast("API keys saved locally in this browser.");
     } catch {
