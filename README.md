@@ -11,6 +11,12 @@ IconFlow uses two separate personal macOSicons API keys:
 
 Both are stored locally in the user's browser. No API key is embedded in source code, Vercel environment variables, a server, or a database.
 
+## Import icons
+
+Use **Import icon URL** to paste a macOSicons share link such as `https://macosicons.com/?icon=Ic1LCu7E7f`. The `icon` query value is resolved to the matching icon, then the existing original-ICNS download/conversion flow is used.
+
+You can also use **Import .txt file** for a text file containing one or more macOSicons share links (up to 100 supported URLs). Direct trusted `.icns` asset URLs remain supported.
+
 ## Search pagination
 
 The search request follows the documented Meilisearch-style contract:
