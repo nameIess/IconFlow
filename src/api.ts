@@ -416,7 +416,7 @@ function normalizedImportUrl(value: string): string | null {
     return iconIdFromImportUrl(url.toString()) ? url.toString() : null;
   }
 
-  if (host === "s3-new.macosicons.com" && /\\.icns(?:$|[?#])/i.test(url.pathname)) {
+  if (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/|[?#])/i.test(url.pathname)) {
     return url.toString();
   }
 
@@ -445,7 +445,7 @@ function importHitMatchesId(hit: IconHit, iconId: string): boolean {
 function directAssetHit(url: string): IconHit {
   const parsed = new URL(url);
   const rawName = decodeURIComponent(parsed.pathname.split("/").pop() || "icon")
-    .replace(/\\.icns$/i, "")
+    .replace(/\.icns$/i, "")
     .replace(/[-_]+/g, " ")
     .trim();
 
