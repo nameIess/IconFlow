@@ -24,9 +24,5 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high --no-package-lock
 
-      - name: Probe macOSicons share URL
-        if: github.head_ref == 'feature/import-icons-from-url-txt'
-        run: node scripts/probe-share.mjs
-
       - name: Typecheck and build
         run: npm run build
