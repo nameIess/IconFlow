@@ -434,7 +434,6 @@ function App() {
         <div className="top-actions">
           <button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button className="settings-button" onClick={() => { setDraftPrimaryKey(primaryApiKey); setDraftBackupKey(backupApiKey); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
-          <button className="settings-button" onClick={() => setImportOpen(true)}><Download size={16} /><span>Import</span></button>
         </div>
       </header>
 
@@ -448,6 +447,11 @@ function App() {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
             <button className="search-submit" type="submit" disabled={loading || pageLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
           </form>
+          <div className="import-actions">
+            <button className="import-button" onClick={() => setImportOpen(true)} disabled={importLoading}>
+              <Download size={15} /> Import icons from URL or TXT
+            </button>
+          </div>
           <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
 
