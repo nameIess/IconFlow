@@ -15,169 +15,161 @@ export type SearchResponse = {
   hits: IconHit[];
   query: string;
   totalHits: number;
-  limit: number;
-  offset: number;
-  page: number;
   totalPages: number;
+  hitsPerPage: number;
+  page: number;
+  offset: number;
 };
 
-const API = "https://api.macosicons.com/api/v1";
+const API_BASE = "https://api.macosicons.com/api/v1";
+export const SEARCH_PAGE_SIZE = 50;
 const REQUEST_TIMEOUT_MS = 15_000;
-export const SEARCH_PAGE_SIZE = Math.max(1, Number(import.meta.env.VITE_SEARCH_PAGE_SIZE || 100));
-const MIN_SEARCH_INTERVAL_MS = Math.max(0, Number(import.meta.env.VITE_MIN_SEARCH_INTERVAL_MS || 1500));
-const SEARCH_CACHE_TTL_MS = Math.max(0, Number(import.meta.env.VITE_SEARCH_CACHE_TTL_MS || 120000));
-const RATE_LIMIT_COOLDOWN_MS = Math.max(5000, Number(import.meta.env.VITE_RATE_LIMIT_COOLDOWN_MS || 60000));
-const SEARCH_WINDOW_MS = Math.max(1000, Number(import.meta.env.VITE_SEARCH_WINDOW_MS || 60000));
-const MAX_SEARCHES_PER_WINDOW = Math.max(1, Number(import.meta.env.VITE_MAX_SEARCHES_PER_WINDOW || 20));
+const MIN_SEARCH_INTERVAL_MS = 550;
+const SEARCH_CACHE_TTL_MS = 120_000;
 
 const searchCache = new Map<string, { expiresAt: number; data: SearchResponse }>();
-const requestTimes: number[] = [];
+const inFlight = new Map<string, Promise<SearchResponse>>();
 let lastSearchStartedAt = 0;
-let rateLimitBlockedUntil = 0;
 
-export function clearSearchCache(): void {
-  searchCache.clear();
+function cacheKey(query: string, page: number): string {
+  return JSON.stringify([query, page, SEARCH_PAGE_SIZE]);
 }
 
-function pruneRequestTimes(now: number): void {
-  while (requestTimes.length && now - requestTimes[0] >= SEARCH_WINDOW_MS) requestTimes.shift();
+function getCached(key: string): SearchResponse | null {
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    searchCache.delete(key);
+    return null;
+  }
+  return entry.data;
 }
 
 async function waitForSearchSlot(): Promise<void> {
-  const now = Date.now();
-  pruneRequestTimes(now);
-  if (now < rateLimitBlockedUntil) {
-    const seconds = Math.ceil((rateLimitBlockedUntil - now) / 1000);
-    throw new Error(`Search temporarily paused after a rate-limit response. Try again in ${seconds}s.`);
-  }
-  const spacingWait = Math.max(0, MIN_SEARCH_INTERVAL_MS - (now - lastSearchStartedAt));
-  if (spacingWait > 0) await new Promise((resolve) => window.setTimeout(resolve, spacingWait));
-  const afterSpacing = Date.now();
-  pruneRequestTimes(afterSpacing);
-  if (requestTimes.length >= MAX_SEARCHES_PER_WINDOW) {
-    const waitMs = Math.max(1, SEARCH_WINDOW_MS - (afterSpacing - requestTimes[0]));
-    throw new Error(`Search limit reached in this browser. Try again in ${Math.ceil(waitMs / 1000)}s.`);
-  }
-  lastSearchStartedAt = afterSpacing;
-  requestTimes.push(afterSpacing);
+  const wait = Math.max(0, MIN_SEARCH_INTERVAL_MS - (Date.now() - lastSearchStartedAt));
+  if (wait > 0) await new Promise((resolve) => window.setTimeout(resolve, wait));
+  lastSearchStartedAt = Date.now();
 }
 
-function getCacheKey(key: string, query: string, limit: number, page: number): string {
-  let hash = 2166136261;
-  for (let index = 0; index < key.length; index += 1) {
-    hash ^= key.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
+function errorMessage(status: number, body: unknown): string {
+  if (body && typeof body === "object" && "message" in body) {
+    const message = (body as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
   }
-  return `${(hash >>> 0).toString(16)}:${query.toLowerCase()}:${limit}:${page}`;
+  if (status === 401) return "The search API key is invalid.";
+  if (status === 429) return "Search rate limit reached. Wait a moment before searching again.";
+  if (status >= 500) return "The macOSicons search service is temporarily unavailable.";
+  return `Search failed (HTTP ${status}).`;
 }
 
-async function readResponse(response: Response): Promise<unknown> {
-  const type = response.headers.get("content-type") || "";
-  if (type.includes("application/json")) {
-    return response.json().catch(() => null);
-  }
-  return response.text().catch(() => "");
-}
+async function requestSearch(apiKey: string, query: string, page: number): Promise<SearchResponse> {
+  await waitForSearchSlot();
 
-async function request(path: string, init: RequestInit): Promise<Response> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    return await fetch(API + path, { ...init, signal: controller.signal });
+    const response = await fetch(`${API_BASE}/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+      body: JSON.stringify({
+        query,
+        searchOptions: {
+          hitsPerPage: SEARCH_PAGE_SIZE,
+          page,
+          offset: (page - 1) * SEARCH_PAGE_SIZE,
+        },
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(errorMessage(response.status, body));
+    if (!body || typeof body !== "object") throw new Error("The search API returned an invalid response.");
+
+    const result = body as Partial<SearchResponse> & { hits?: unknown };
+    if (!Array.isArray(result.hits)) throw new Error("The search API returned no valid icon list.");
+
+    const hitsPerPage = Number(result.hitsPerPage) || SEARCH_PAGE_SIZE;
+    const totalHits = Math.max(0, Number(result.totalHits) || result.hits.length);
+    const responsePage = Number(result.page);
+    const responseOffset = Number(result.offset);
+
+    return {
+      hits: result.hits as IconHit[],
+      query: typeof result.query === "string" ? result.query : query,
+      totalHits,
+      totalPages: Math.max(1, Number(result.totalPages) || Math.ceil(totalHits / hitsPerPage)),
+      hitsPerPage,
+      page: Number.isInteger(responsePage) && responsePage > 0 ? responsePage : page,
+      offset: Number.isInteger(responseOffset) && responseOffset >= 0 ? responseOffset : (page - 1) * hitsPerPage,
+    };
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("The macOSicons request timed out. Check your connection and try again.");
-    }
-    throw new Error("Unable to reach macOSicons. Check your connection and try again.");
+    if (error instanceof DOMException && error.name === "AbortError") throw new Error("The search request timed out. Try again.");
+    throw error instanceof Error ? error : new Error("Search failed.");
   } finally {
     window.clearTimeout(timer);
   }
 }
 
-export async function searchIcons(
-  key: string,
-  query: string,
-  limit = SEARCH_PAGE_SIZE,
-  page = 1,
-): Promise<SearchResponse> {
-  const normalizedKey = key.trim();
+export async function searchIcons(apiKey: string, query: string, page = 1): Promise<SearchResponse> {
+  const key = apiKey.trim();
   const normalizedQuery = query.trim();
-
-  if (!normalizedKey) throw new Error("Add your macOSicons API key in Settings first.");
-  if (!normalizedQuery) throw new Error("Enter an app name to search.");
-  if (normalizedQuery.length > 100) throw new Error("Search must be 100 characters or fewer.");
-
-  const normalizedLimit = Math.min(Math.max(limit, 1), SEARCH_PAGE_SIZE);
   const normalizedPage = Math.max(1, Math.floor(page));
-  const cacheKey = getCacheKey(normalizedKey, normalizedQuery, normalizedLimit, normalizedPage);
-  const cached = searchCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
-  if (cached) searchCache.delete(cacheKey);
 
-  await waitForSearchSlot();
+  if (!key) throw new Error("Add your search API key in Settings first.");
+  if (!normalizedQuery) throw new Error("Enter an icon name to search.");
+  if (normalizedQuery.length > 100) throw new Error("Search queries are limited to 100 characters.");
 
-  const response = await request("/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": normalizedKey },
-    body: JSON.stringify({
-      query: normalizedQuery,
-      limit: normalizedLimit,
-      page: normalizedPage,
-    }),
-  });
+  const keyForCache = cacheKey(normalizedQuery, normalizedPage);
+  const cached = getCached(keyForCache);
+  if (cached) return cached;
 
-  const data = await readResponse(response) as Partial<SearchResponse> & { error?: string; message?: string } | null;
+  const pending = inFlight.get(keyForCache);
+  if (pending) return pending;
 
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("The API key was rejected. Check your macOSicons key in Settings.");
-    }
-    if (response.status === 429) {
-      rateLimitBlockedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS;
-      throw new Error(`macOSicons rate limit reached. Search paused for ${Math.ceil(RATE_LIMIT_COOLDOWN_MS / 1000)}s to avoid repeated requests.`);
-    }
-    throw new Error(data?.error || data?.message || "macOSicons request failed (" + response.status + ").");
-  }
+  const request = requestSearch(key, normalizedQuery, normalizedPage)
+    .then((data) => {
+      searchCache.set(keyForCache, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, data });
+      return data;
+    })
+    .finally(() => inFlight.delete(keyForCache));
 
-  if (!data || !Array.isArray(data.hits)) {
-    throw new Error("macOSicons returned an unexpected response.");
-  }
-
-  const result = data as SearchResponse;
-  searchCache.set(cacheKey, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, data: result });
-  return result;
+  inFlight.set(keyForCache, request);
+  return request;
 }
 
-export async function fetchIcns(url: string): Promise<ArrayBuffer> {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("The icon source URL is invalid.");
-  }
+export function clearSearchCache(): void {
+  searchCache.clear();
+  inFlight.clear();
+}
 
-  if (parsed.protocol !== "https:" || !parsed.hostname) {
-    throw new Error("IconFlow only downloads secure HTTPS icon sources.");
-  }
+export async function fetchIcns(url: string, downloadApiKey: string): Promise<ArrayBuffer> {
+  const key = downloadApiKey.trim();
+  if (!key) throw new Error("Add your download API key in Settings first.");
+
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("The icon source URL is invalid."); }
+  if (parsed.protocol !== "https:") throw new Error("Blocked insecure icon source.");
 
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(parsed.href, { signal: controller.signal });
-    if (!response.ok) throw new Error("Unable to fetch the icon source (" + response.status + ").");
+    const response = await fetch(parsed.href, {
+      headers: { "x-api-key": key },
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Unable to fetch the original icon (HTTP ${response.status}).`);
     const buffer = await response.arrayBuffer();
     if (buffer.byteLength < 8) throw new Error("The icon source returned an empty or invalid file.");
     return buffer;
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("Unable to fetch")) throw error;
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("The icon download timed out. Try again.");
-    }
-    throw new Error("The icon source could not be downloaded in this browser.");
+    if (error instanceof DOMException && error.name === "AbortError") throw new Error("The icon download timed out. Try again.");
+    throw error instanceof Error ? error : new Error("The icon source could not be downloaded.");
   } finally {
     window.clearTimeout(timer);
   }
 }
-
