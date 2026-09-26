@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, KeyRound, Link2, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, Upload, X } from "lucide-react";
 import { clearSearchCache, fetchIcns, fetchImageAsset, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
 import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl, zipFiles } from "./converter";
 
