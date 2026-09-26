@@ -155,6 +155,61 @@ export async function icnsToPng(buffer: ArrayBuffer): Promise<Blob> {
   return new Blob([blobBytes(await renderPng(source, size))], { type: "image/png" });
 }
 
+export async function imageToIco(buffer: ArrayBuffer, mimeType = "image/png"): Promise<Blob> {
+  const imageUrl = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
+  try {
+    const image = new Image();
+    image.src = imageUrl;
+    await image.decode();
+
+    const sizes = [16, 24, 32, 48, 64, 128, 256];
+    const images = await Promise.all(sizes.map(async (size) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas is unavailable.");
+      context.clearRect(0, 0, size, size);
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(image, 0, 0, size, size);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("PNG encoding failed.");
+      return new Uint8Array(await blob.arrayBuffer());
+    }));
+
+    const imageStart = 6 + sizes.length * 16;
+    const total = imageStart + images.reduce((sum, item) => sum + item.length, 0);
+    const output = new ArrayBuffer(total);
+    const view = new DataView(output);
+    const bytes = new Uint8Array(output);
+
+    view.setUint16(0, 0, true);
+    view.setUint16(2, 1, true);
+    view.setUint16(4, sizes.length, true);
+
+    let cursor = imageStart;
+    sizes.forEach((size, index) => {
+      const entry = 6 + index * 16;
+      const imageData = images[index];
+      view.setUint8(entry, size === 256 ? 0 : size);
+      view.setUint8(entry + 1, size === 256 ? 0 : size);
+      view.setUint8(entry + 2, 0);
+      view.setUint8(entry + 3, 0);
+      view.setUint16(entry + 4, 1, true);
+      view.setUint16(entry + 6, 32, true);
+      view.setUint32(entry + 8, imageData.length, true);
+      view.setUint32(entry + 12, cursor, true);
+      bytes.set(imageData, cursor);
+      cursor += imageData.length;
+    });
+
+    return new Blob([output], { type: "image/x-icon" });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
 export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
   const source = extractBestPng(buffer);
   const sizes = [16, 24, 32, 48, 64, 128, 256];
