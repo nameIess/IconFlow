@@ -77,16 +77,17 @@ function findAsset(html: string, base: string): string | null {
   return unique.find((url) => /\.icns(?:$|[?#])/i.test(url)) ?? unique[0] ?? null;
 }
 
-export default async function handler(req: any, res: any) {
-  if (req.method !== "GET") {
-    res.status(405).json({ error: "Method not allowed." });
-    return;
-  }
+type ResolveResult = {
+  status: number;
+  body: { assetUrl?: string; assetType?: string; error?: string };
+};
 
-  const raw = typeof req.query?.url === "string" ? req.query.url : "";
+export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveResult> {
   if (!isAllowedShareUrl(raw)) {
-    res.status(400).json({ error: "Only macOSicons HTTPS share URLs are supported." });
-    return;
+    return {
+      status: 400,
+      body: { error: "Only macOSicons HTTPS share URLs are supported." },
+    };
   }
 
   try {
@@ -100,39 +101,71 @@ export default async function handler(req: any, res: any) {
 
     const contentType = response.headers.get("content-type") || "";
     if (!response.ok) {
-      res.status(502).json({ error: `macOSicons returned HTTP ${response.status}.` });
-      return;
+      return {
+        status: 502,
+        body: { error: `macOSicons returned HTTP ${response.status}.` },
+      };
     }
 
     if (contentType.startsWith("image/") && isAssetUrl(response.url)) {
-      res.status(200).json({ assetUrl: response.url, assetType: contentType.split("/")[1] });
-      return;
+      return {
+        status: 200,
+        body: {
+          assetUrl: response.url,
+          assetType: contentType.split("/")[1],
+        },
+      };
     }
 
     // Never accept an HTML response after a redirect to an unrelated host.
     if (!isAllowedShareUrl(response.url || raw)) {
-      res.status(502).json({ error: "macOSicons redirected to an untrusted host." });
-      return;
+      return {
+        status: 502,
+        body: { error: "macOSicons redirected to an untrusted host." },
+      };
     }
 
     const contentLength = Number(response.headers.get("content-length") || 0);
     if (contentLength > MAX_HTML_BYTES) {
-      res.status(502).json({ error: "The macOSicons page is too large to inspect." });
-      return;
+      return {
+        status: 502,
+        body: { error: "The macOSicons page is too large to inspect." },
+      };
     }
 
     const html = (await response.text()).slice(0, MAX_HTML_BYTES);
     const assetUrl = findAsset(html, response.url || raw);
     if (!assetUrl) {
-      res.status(404).json({ error: "The macOSicons share page did not expose a downloadable icon asset." });
-      return;
+      return {
+        status: 404,
+        body: {
+          error: "The macOSicons share page did not expose a downloadable icon asset.",
+        },
+      };
     }
 
-    res.status(200).json({
-      assetUrl,
-      assetType: /\.icns(?:$|[?#])/i.test(assetUrl) ? "icns" : "image",
-    });
+    return {
+      status: 200,
+      body: {
+        assetUrl,
+        assetType: /\.icns(?:$|[?#])/i.test(assetUrl) ? "icns" : "image",
+      },
+    };
   } catch {
-    res.status(502).json({ error: "Unable to resolve the macOSicons share page." });
+    return {
+      status: 502,
+      body: { error: "Unable to resolve the macOSicons share page." },
+    };
   }
+}
+
+export default async function handler(req: any, res: any) {
+  if (req.method !== "GET") {
+    res.status(405).json({ error: "Method not allowed." });
+    return;
+  }
+
+  const raw = typeof req.query?.url === "string" ? req.query.url : "";
+  const result = await resolveMacosiconsShareUrl(raw);
+  res.status(result.status).json(result.body);
 }
