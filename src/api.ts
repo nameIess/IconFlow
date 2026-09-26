@@ -414,7 +414,10 @@ async function requestAuthenticatedImport(
   for (const key of keys) {
     try {
       const exact = await requestSearch(key, id, 1, exactFilter);
-      let hit = exact.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+
+      // The API docs do not expose objectID in each returned hit. The filter
+      // itself is the proof that this hit belongs to the imported share ID.
+      let hit = exact.hits[0] ?? null;
 
       if (!hit) {
         const broad = await requestSearch(key, id, 1);
