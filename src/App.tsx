@@ -154,10 +154,9 @@ function App() {
 
   async function openPreview(hit: IconHit) {
     if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
-    if (!downloadApiKey) return setSettingsOpen(true);
     setPreview({ hit, loading: true });
     try {
-      const buffer = await fetchIcns(hit.icnsUrl, downloadApiKey);
+      const buffer = await fetchIcns(hit.icnsUrl);
       setPreview({ hit, url: await previewUrl(buffer), loading: false });
     } catch (error) {
       setPreview({ hit, loading: false });
