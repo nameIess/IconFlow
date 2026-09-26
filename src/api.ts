@@ -47,7 +47,9 @@ const searchCache = new Map<string, CacheEntry>();
 let persistentCacheLoaded = false;
 type SearchResult = SearchResponse & { usedBackup: boolean };
 const inFlight = new Map<string, Promise<SearchResult>>();
+const activeControllers = new Set<AbortController>();
 const rateLimitedUntil = new Map<string, number>();
+let cacheGeneration = 0;
 const searchStarts: number[] = [];
 let lastSearchStartedAt = 0;
 
@@ -186,6 +188,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
   await waitForSearchSlot();
 
   const controller = new AbortController();
+  activeControllers.add(controller);
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
@@ -261,6 +264,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
     throw error instanceof Error ? error : new Error("Search failed.");
   } finally {
     window.clearTimeout(timer);
+    activeControllers.delete(controller);
   }
 }
 
@@ -294,12 +298,14 @@ export async function searchIcons(
   if (normalizedQuery.length > 100) throw new Error("Search queries are limited to 100 characters.");
 
   const keyForCache = cacheKey(normalizedQuery, normalizedPage);
+  const inFlightKey = JSON.stringify([primaryKey, backupKey, normalizedQuery, normalizedPage]);
   const cached = getCached(keyForCache);
   if (cached) return { ...cached, usedBackup: false };
 
-  const pending = inFlight.get(keyForCache);
+  const pending = inFlight.get(inFlightKey);
   if (pending) return pending;
 
+  const requestGeneration = cacheGeneration;
   const request = (async (): Promise<SearchResult> => {
     const primaryLimited = Date.now() < (rateLimitedUntil.get(primaryKey) ?? 0);
 
@@ -322,22 +328,27 @@ export async function searchIcons(
   })()
     .then((result) => {
       const { usedBackup, ...data } = result;
-      searchCache.set(keyForCache, {
-        expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
-        data,
-      });
-      persistSearchCache();
+      if (requestGeneration === cacheGeneration) {
+        searchCache.set(keyForCache, {
+          expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+          data,
+        });
+        persistSearchCache();
+      }
       return { ...data, usedBackup };
     })
-    .finally(() => inFlight.delete(keyForCache));
+    .finally(() => inFlight.delete(inFlightKey));
 
-  inFlight.set(keyForCache, request);
+  inFlight.set(inFlightKey, request);
   return request;
 }
 
 export function clearSearchCache(): void {
+  cacheGeneration += 1;
   searchCache.clear();
   inFlight.clear();
+  for (const controller of activeControllers) controller.abort();
+  activeControllers.clear();
   persistentCacheLoaded = true;
   rateLimitedUntil.clear();
   searchStarts.length = 0;
@@ -368,6 +379,9 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
       signal: controller.signal,
       cache: "no-store",
     });
+    if (!isTrustedAssetUrl(response.url)) {
+      throw new Error("The icon source redirected to an untrusted host.");
+    }
     if (!response.ok) {
       throw new Error(`Unable to fetch the original icon (HTTP ${response.status}).`);
     }
