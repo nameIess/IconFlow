@@ -184,7 +184,12 @@ function nonNegativeInteger(value: unknown): number | null {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
-async function requestSearch(apiKey: string, query: string, page: number): Promise<SearchResponse> {
+async function requestSearch(
+  apiKey: string,
+  query: string,
+  page: number,
+  filters: string[] = [],
+): Promise<SearchResponse> {
   await waitForSearchSlot();
 
   const controller = new AbortController();
@@ -204,6 +209,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
           hitsPerPage: SEARCH_PAGE_SIZE,
           page,
           offset: (page - 1) * SEARCH_PAGE_SIZE,
+          ...(filters.length ? { filters } : {}),
         },
       }),
       signal: controller.signal,
@@ -376,8 +382,8 @@ function shareIdFromUrl(value: string): string | null {
     } catch {}
   }
 
-  const segment = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "");
-  const match = segment.match(/-([A-Za-z0-9]{8,})$/);
+  const lastSegment = url.pathname.split("/").filter(Boolean).at(-1) || "";
+  const match = lastSegment.match(/-([A-Za-z0-9]{8,})$/);
   return match?.[1] || null;
 }
 
@@ -389,70 +395,29 @@ function importHitMatchesId(hit: IconHit, id: string): boolean {
     .some((value) => value.toLowerCase().includes(target));
 }
 
-async function requestPublicImport(id: string): Promise<IconHit | null> {
-  await waitForSearchSlot();
-
-  const controller = new AbortController();
-  activeControllers.add(controller);
-  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await fetch("https://macosicons.com/api/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: id,
-        searchOptions: {
-          filters: ["objectID = " + JSON.stringify(id)],
-          hitsPerPage: 1,
-          page: 1,
-        },
-      }),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    if (!response.ok) return null;
-
-    const body: unknown = await response.json().catch(() => null);
-    let hits: unknown[] = [];
-    if (Array.isArray(body)) {
-      hits = body;
-    } else if (body !== null && typeof body === "object") {
-      const maybeHits = (body as Record<string, unknown>).hits;
-      if (Array.isArray(maybeHits)) hits = maybeHits;
-    }
-
-    const candidate = hits.find((item): item is IconHit => {
-      if (!item || typeof item !== "object") return false;
-      return importHitMatchesId(item as IconHit, id);
-    });
-
-    return candidate ?? null;
-  } catch {
-    return null;
-  } finally {
-    window.clearTimeout(timer);
-    activeControllers.delete(controller);
-  }
-}
-
 async function requestAuthenticatedImport(
   primaryApiKey: string,
   backupApiKey: string,
   id: string,
 ): Promise<{ hit: IconHit | null; usedBackup: boolean }> {
-  const keys = [primaryApiKey.trim(), backupApiKey.trim()]
-    .filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+  const primaryKey = primaryApiKey.trim();
+  const backupKey = backupApiKey.trim();
+  const keys = [primaryKey, backupKey].filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+
+  if (!keys.length) throw new Error("Add your primary API key in Settings first.");
+
+  const exactFilter = [`objectID = ${JSON.stringify(id)}`];
 
   for (const key of keys) {
     try {
-      const data = await requestSearch(key, id, 1);
+      const data = await requestSearch(key, id, 1, exactFilter);
       const hit = data.hits.find((item) => importHitMatchesId(item, id)) ?? null;
-      if (hit) return { hit, usedBackup: key === backupApiKey.trim() && key !== primaryApiKey.trim() };
+      if (hit) {
+        return { hit, usedBackup: key === backupKey && key !== primaryKey };
+      }
     } catch (error) {
       if (error instanceof RateLimitError) continue;
-      if (key === primaryApiKey.trim() && backupApiKey.trim()) continue;
+      if (key === primaryKey && backupKey && backupKey !== primaryKey) continue;
       throw error;
     }
   }
@@ -538,16 +503,13 @@ export async function importIconUrls(
       continue;
     }
 
-    let hit = await requestPublicImport(id);
-
-    if (!hit) {
-      const fallback = await requestAuthenticatedImport(primaryApiKey, backupApiKey, id);
-      hit = fallback.hit;
-      usedBackup = usedBackup || fallback.usedBackup;
+    const result = await requestAuthenticatedImport(primaryApiKey, backupApiKey, id);
+    if (result.hit) {
+      hits.push(result.hit);
+      usedBackup = usedBackup || result.usedBackup;
+    } else {
+      failed.push(raw);
     }
-
-    if (hit) hits.push(hit);
-    else failed.push(raw);
   }
 
   return { hits, failed, usedBackup };
