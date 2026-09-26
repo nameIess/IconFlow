@@ -6,18 +6,21 @@ const response = await fetch(url, {
   },
   redirect: "follow",
 });
-const text = await response.text();
+const body = await response.text();
+const interestingLines = body
+  .split(/\r?\n/u)
+  .filter((line) => /s3-new\.macosicons\.com|\.icns(?:[?#"'\s]|$)/iu.test(line))
+  .slice(0, 20);
+
 console.log(JSON.stringify({
   status: response.status,
   finalUrl: response.url,
   contentType: response.headers.get("content-type"),
-  length: text.length,
-  hasIcns: /\\.icns(?:[?#"']|$)/i.test(text),
-  assetUrls: [...new Set(text.match(/https?:\\/\\/[^\\s"'<>]+/g) || [])]
-    .filter((value) => /(?:s3-new\\.macosicons\\.com|\\.icns(?:[?#]|$))/i.test(value))
-    .slice(0, 20),
-  title: text.match(/<title[^>]*>([^<]+)<\\/title>/i)?.[1] || null,
+  length: body.length,
+  hasIcns: /\.icns(?:[?#"'\s]|$)/iu.test(body),
+  hasMacosiconsAsset: body.includes("s3-new.macosicons.com"),
+  title: body.match(/<title[^>]*>([^<]+)<\/title>/iu)?.[1] || null,
+  interestingLines,
 }, null, 2));
-if (!response.ok) process.exit(1);
 
-// CI probe intentionally targets the supplied share URL.
+if (!response.ok) process.exit(1);
