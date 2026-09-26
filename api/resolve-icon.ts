@@ -34,8 +34,8 @@ function cleanUrl(value: string, base: string): string | null {
 function findAsset(html: string, base: string): string | null {
   const candidates: string[] = [];
   const patterns = [
-    /(?:href|src|content|data-src)\\s*=\\s*["']([^"']+)["']/gi,
-    /https?:\\/\\/[^\\s"'<>\\]+/gi,
+    /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi,
+    /https?:\\/\\/[^\s"'<>\\]+/gi,
   ];
 
   for (const pattern of patterns) {
@@ -47,7 +47,7 @@ function findAsset(html: string, base: string): string | null {
   }
 
   const unique = [...new Set(candidates)];
-  return unique.find((url) => /\\.icns(?:$|[?#])/i.test(url)) ?? unique[0] ?? null;
+  return unique.find((url) => /\.icns(?:$|[?#])/i.test(url)) ?? unique[0] ?? null;
 }
 
 export default async function handler(req: any, res: any) {
@@ -94,7 +94,7 @@ export default async function handler(req: any, res: any) {
 
     res.status(200).json({
       assetUrl,
-      assetType: /\\.icns(?:$|[?#])/i.test(assetUrl) ? "icns" : "image",
+      assetType: /\.icns(?:$|[?#])/i.test(assetUrl) ? "icns" : "image",
     });
   } catch {
     res.status(502).json({ error: "Unable to resolve the macOSicons share page." });
