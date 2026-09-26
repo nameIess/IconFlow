@@ -50,7 +50,7 @@ function cleanUrl(value: string, base: string): string | null {
   }
 }
 
-function findAsset(html: string, base: string): string | null {
+function findAssets(html: string, base: string): { icnsUrl: string | null; previewUrl: string | null } {
   // Nuxt serializes the icon record as JSON inside __NUXT_DATA__ and escapes
   // slashes as "\/". Normalize those escapes before looking for asset URLs.
   const normalized = html
@@ -58,28 +58,40 @@ function findAsset(html: string, base: string): string | null {
     .replaceAll("\\u002F", "/")
     .replaceAll("&amp;", "&");
 
-  const candidates: string[] = [];
+  const icnsCandidates: string[] = [];
+  const previewCandidates: string[] = [];
   const patterns = [
-    /"icnsUrl"\s*:\s*"([^"]+)"/gi,
-    /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi,
-    /https?:\/\/[^\s"'<>\\]+/gi,
+    { target: "icns", regex: /"icnsUrl"\s*:\s*"([^"]+)"/gi },
+    { target: "preview", regex: /"lowResPngUrl"\s*:\s*"([^"]+)"/gi },
+    { target: "preview", regex: /"pngUrl"\s*:\s*"([^"]+)"/gi },
+    { target: "generic", regex: /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi },
+    { target: "generic", regex: /https?:\/\/[^\s"'<>\\]+/gi },
   ];
 
   for (const pattern of patterns) {
     for (const match of normalized.matchAll(pattern)) {
       const value = match[1] ?? match[0];
       const url = cleanUrl(value, base);
-      if (url) candidates.push(url);
+      if (!url) continue;
+      if (pattern.target === "icns" || /\.icns(?:$|[?#])/i.test(url)) {
+        icnsCandidates.push(url);
+      } else {
+        previewCandidates.push(url);
+      }
     }
   }
 
-  const unique = [...new Set(candidates)];
-  return unique.find((url) => /\.icns(?:$|[?#])/i.test(url)) ?? unique[0] ?? null;
+  const uniqueIcns = [...new Set(icnsCandidates)];
+  const uniquePreview = [...new Set(previewCandidates)];
+  return {
+    icnsUrl: uniqueIcns.find((url) => /\.icns(?:$|[?#])/i.test(url)) ?? null,
+    previewUrl: uniquePreview.find((url) => /\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(url)) ?? null,
+  };
 }
 
 type ResolveResult = {
   status: number;
-  body: { assetUrl?: string; assetType?: string; error?: string };
+  body: { assetUrl?: string; assetType?: string; previewUrl?: string; error?: string };
 };
 
 export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveResult> {
@@ -134,8 +146,8 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
     }
 
     const html = (await response.text()).slice(0, MAX_HTML_BYTES);
-    const assetUrl = findAsset(html, response.url || raw);
-    if (!assetUrl) {
+    const assets = findAssets(html, response.url || raw);
+    if (!assets.icnsUrl && !assets.previewUrl) {
       return {
         status: 404,
         body: {
@@ -147,8 +159,9 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
     return {
       status: 200,
       body: {
-        assetUrl,
-        assetType: /\.icns(?:$|[?#])/i.test(assetUrl) ? "icns" : "image",
+        assetUrl: assets.icnsUrl ?? assets.previewUrl ?? undefined,
+        assetType: assets.icnsUrl ? "icns" : "image",
+        previewUrl: assets.previewUrl ?? undefined,
       },
     };
   } catch {
