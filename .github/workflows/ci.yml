@@ -39,5 +39,8 @@ jobs:
           grep -q '"previewUrl":"https://s3-new.macosicons.com/' /tmp/iconflow-resolver.json
           kill "$pid"
 
+      - name: Check macOSicons preview source
+        run: node scripts/check-preview-source.mjs
+
       - name: Typecheck and build
         run: npm run build
