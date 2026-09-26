@@ -451,10 +451,7 @@ function App() {
             </form>
             <div className="import-actions">
               <button type="button" className="import-button glass" onClick={() => setImportOpen(true)} disabled={loading || pageLoading || importLoading}>
-                <Link2 size={15} /> Import icon URL
-              </button>
-              <button type="button" className="import-button glass" onClick={() => importFileRef.current?.click()} disabled={loading || pageLoading || importLoading}>
-                <Upload size={15} /> Import .txt file
+                <Download size={15} /> Import icons from URL or TXT
               </button>
               <input
                 ref={importFileRef}
