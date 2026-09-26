@@ -390,9 +390,12 @@ function shareIdFromUrl(value: string): string | null {
 function importHitMatchesId(hit: IconHit, id: string): boolean {
   const target = id.trim().toLowerCase();
   if (!target) return false;
-  return [hit.objectID, hit.icnsUrl, hit.lowResPngUrl]
-    .filter((value): value is string => Boolean(value))
-    .some((value) => value.toLowerCase().includes(target));
+
+  const candidateValues = Object.values(hit)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.toLowerCase());
+
+  return candidateValues.some((value) => value.includes(target));
 }
 
 async function requestAuthenticatedImport(
@@ -410,8 +413,14 @@ async function requestAuthenticatedImport(
 
   for (const key of keys) {
     try {
-      const data = await requestSearch(key, id, 1, exactFilter);
-      const hit = data.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+      const exact = await requestSearch(key, id, 1, exactFilter);
+      let hit = exact.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+
+      if (!hit) {
+        const broad = await requestSearch(key, id, 1);
+        hit = broad.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+      }
+
       if (hit) {
         return { hit, usedBackup: key === backupKey && key !== primaryKey };
       }
