@@ -32,7 +32,8 @@ const MAX_PERSISTED_CACHE_ENTRIES = 20;
 type CacheEntry = { expiresAt: number; data: SearchResponse };
 const searchCache = new Map<string, CacheEntry>();
 let persistentCacheLoaded = false;
-const inFlight = new Map<string, Promise<SearchResponse>>();
+type SearchResult = SearchResponse & { usedBackup: boolean };
+const inFlight = new Map<string, Promise<SearchResult>>();
 let lastSearchStartedAt = 0;
 
 function cacheKey(query: string, page: number): string {
@@ -104,13 +105,20 @@ async function waitForSearchSlot(): Promise<void> {
   lastSearchStartedAt = Date.now();
 }
 
+export class RateLimitError extends Error {
+  constructor() {
+    super("Search rate limit reached for this API key.");
+    this.name = "RateLimitError";
+  }
+}
+
 function errorMessage(status: number, body: unknown): string {
   if (body && typeof body === "object" && "message" in body) {
     const message = (body as { message?: unknown }).message;
     if (typeof message === "string" && message.trim()) return message;
   }
-  if (status === 401) return "The search API key is invalid.";
-  if (status === 429) return "Search rate limit reached. Wait a moment before searching again.";
+  if (status === 401) return "The API key is invalid.";
+  if (status === 429) return "Search rate limit reached for this API key.";
   if (status >= 500) return "The macOSicons search service is temporarily unavailable.";
   return `Search failed (HTTP ${status}).`;
 }
@@ -138,7 +146,10 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
     });
 
     const body: unknown = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(errorMessage(response.status, body));
+    if (!response.ok) {
+      if (response.status === 429) throw new RateLimitError();
+      throw new Error(errorMessage(response.status, body));
+    }
     if (!body || typeof body !== "object") throw new Error("The search API returned an invalid response.");
 
     const result = body as Partial<SearchResponse> & { hits?: unknown };
@@ -166,27 +177,36 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
   }
 }
 
-export async function searchIcons(apiKey: string, query: string, page = 1): Promise<SearchResponse> {
-  const key = apiKey.trim();
+export async function searchIcons(primaryApiKey: string, backupApiKey: string, query: string, page = 1): Promise<SearchResult> {
+  const primaryKey = primaryApiKey.trim();
+  const backupKey = backupApiKey.trim();
   const normalizedQuery = query.trim();
   const normalizedPage = Math.max(1, Math.floor(page));
 
-  if (!key) throw new Error("Add your search API key in Settings first.");
+  if (!primaryKey) throw new Error("Add your primary API key in Settings first.");
   if (!normalizedQuery) throw new Error("Enter an icon name to search.");
   if (normalizedQuery.length > 100) throw new Error("Search queries are limited to 100 characters.");
 
   const keyForCache = cacheKey(normalizedQuery, normalizedPage);
   const cached = getCached(keyForCache);
-  if (cached) return cached;
+  if (cached) return { ...cached, usedBackup: false };
 
   const pending = inFlight.get(keyForCache);
   if (pending) return pending;
 
-  const request = requestSearch(key, normalizedQuery, normalizedPage)
-    .then((data) => {
+  const request = (async (): Promise<SearchResult> => {
+    try {
+      return { ...(await requestSearch(primaryKey, normalizedQuery, normalizedPage)), usedBackup: false };
+    } catch (error) {
+      if (!(error instanceof RateLimitError) || !backupKey || backupKey === primaryKey) throw error;
+      return { ...(await requestSearch(backupKey, normalizedQuery, normalizedPage)), usedBackup: true };
+    }
+  })()
+    .then((result) => {
+      const { usedBackup, ...data } = result;
       searchCache.set(keyForCache, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, data });
       persistSearchCache();
-      return data;
+      return { ...data, usedBackup };
     })
     .finally(() => inFlight.delete(keyForCache));
 
@@ -201,9 +221,7 @@ export function clearSearchCache(): void {
   try { localStorage.removeItem(PERSISTED_CACHE_KEY); } catch {}
 }
 
-export async function fetchIcns(url: string, downloadApiKey: string): Promise<ArrayBuffer> {
-  if (!downloadApiKey.trim()) throw new Error("Add your download API key in Settings first.");
-
+export async function fetchIcns(url: string): Promise<ArrayBuffer> {
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("The icon source URL is invalid."); }
 
