@@ -367,22 +367,6 @@ function parseUrlCandidate(value: string): URL | null {
   }
 }
 
-function normalizedImportUrl(value: string): string | null {
-  const url = parseUrlCandidate(value);
-  if (!url) return null;
-  const host = url.hostname.toLowerCase();
-
-  if (host === MACOSICONS_HOST || host === MACOSICONS_WWW_HOST) {
-    return url.searchParams.get("icon")?.trim() ? url.toString() : null;
-  }
-
-  if (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
-    return url.toString();
-  }
-
-  return null;
-}
-
 function iconIdFromImportUrl(value: string): string | null {
   const url = parseUrlCandidate(value);
   if (!url) return null;
@@ -390,22 +374,38 @@ function iconIdFromImportUrl(value: string): string | null {
   const host = url.hostname.toLowerCase();
   if (host !== MACOSICONS_HOST && host !== MACOSICONS_WWW_HOST) return null;
 
-  // macOSicons share links use a hash route:
-  // https://macosicons.com/#/?icon=<id>
-  // Keep supporting the older direct-query form too.
   const directId = url.searchParams.get("icon")?.trim();
   if (directId) return directId;
 
+  // Current macOSicons share links use a hash route:
+  // https://macosicons.com/#/?icon=<id>
   const hash = url.hash.replace(/^#/, "");
   if (!hash) return null;
 
+  const queryIndex = hash.indexOf("?");
+  if (queryIndex < 0) return null;
+
   try {
-    const hashUrl = new URL(hash.startsWith("?") ? `https://macosicons.com/${hash}` : `https://macosicons.com/${hash}`);
-    return hashUrl.searchParams.get("icon")?.trim() || null;
+    return new URLSearchParams(hash.slice(queryIndex + 1)).get("icon")?.trim() || null;
   } catch {
-    const match = hash.match(/[?&]icon=([^&#]+)/i);
-    return match ? decodeURIComponent(match[1]).trim() : null;
+    return null;
   }
+}
+
+function normalizedImportUrl(value: string): string | null {
+  const url = parseUrlCandidate(value);
+  if (!url) return null;
+  const host = url.hostname.toLowerCase();
+
+  if (host === MACOSICONS_HOST || host === MACOSICONS_WWW_HOST) {
+    return iconIdFromImportUrl(value) ? url.toString() : null;
+  }
+
+  if (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
+    return url.toString();
+  }
+
+  return null;
 }
 
 function scoreImportedHit(hit: IconHit, iconId: string): number {
