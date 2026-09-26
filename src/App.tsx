@@ -158,11 +158,11 @@ function App() {
         setFormatById({});
         setImportOpen(false);
 
-        const failedText = data.failed.length ? \` \${data.failed.length} link(s) could not be resolved.\` : "";
+        const failedText = data.failed.length ? ` ${data.failed.length} link(s) could not be resolved.` : "";
         const backupText = data.usedBackup ? " Backup API key was used." : "";
-        setToast(\`Imported \${data.hits.length} icon(s).\${failedText}\${backupText}\`);
+        setToast(`Imported ${data.hits.length} icon(s).${failedText}${backupText}`);
       } else {
-        setToast(data.failed.length ? \`Imported 0 icon(s); \${data.failed.length} link(s) could not be resolved.\` : "No supported icon links were found.");
+        setToast(data.failed.length ? `Imported 0 icon(s); ${data.failed.length} link(s) could not be resolved.` : "No supported icon links were found.");
       }
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Icon import failed.");
