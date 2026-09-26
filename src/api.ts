@@ -349,8 +349,7 @@ function isTrustedAssetUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     const hostname = parsed.hostname.toLowerCase();
-    return parsed.protocol === "https:" &&
-      (hostname === "s3-new.macosicons.com" || hostname.endsWith(".macosicons.com"));
+    return parsed.protocol === "https:" && hostname === "s3-new.macosicons.com";
   } catch {
     return false;
   }
