@@ -139,13 +139,6 @@ function App() {
   }
 
   async function importUrls(urls: string[]) {
-    if (!primaryApiKey) {
-      setImportOpen(false);
-      setSettingsOpen(true);
-      setToast("Add your primary API key first.");
-      return;
-    }
-
     setImportLoading(true);
     try {
       const data = await importIconUrls(primaryApiKey, backupApiKey, urls);
