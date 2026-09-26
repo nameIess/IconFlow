@@ -460,6 +460,89 @@ function directAssetHit(url: string): IconHit {
   };
 }
 
+async function requestImportSearch(apiKey: string, shareId: string): Promise<SearchResponse> {
+  const normalizedId = shareId.trim();
+  if (!normalizedId) throw new Error("Icon share ID is required.");
+
+  await waitForSearchSlot();
+
+  const controller = new AbortController();
+  activeControllers.add(controller);
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${API_BASE}/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        // The API requires a non-empty query even when an exact objectID
+        // filter is being used.
+        query: normalizedId,
+        searchOptions: {
+          hitsPerPage: 1,
+          page: 1,
+          offset: 0,
+          filters: [`objectID = ${JSON.stringify(normalizedId)}`],
+        },
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    const body: unknown = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      if (response.status === 429) throw new RateLimitError();
+      throw new Error(errorMessage(response.status, body));
+    }
+
+    if (!body || typeof body !== "object") {
+      throw new Error("The import search API returned an invalid response.");
+    }
+
+    const result = body as Record<string, unknown>;
+    if (!Array.isArray(result.hits)) {
+      throw new Error("The import search API returned no valid icon list.");
+    }
+
+    const hits = result.hits as IconHit[];
+    const totalHits = Number.isFinite(Number(result.totalHits))
+      ? Math.max(0, Math.floor(Number(result.totalHits)))
+      : hits.length;
+
+    return {
+      hits,
+      query: typeof result.query === "string" ? result.query : normalizedId,
+      totalHits,
+      totalPages: Math.max(1, Number.isFinite(Number(result.totalPages))
+        ? Math.floor(Number(result.totalPages))
+        : Math.ceil(totalHits / Math.max(1, hits.length))),
+      hitsPerPage: Number.isFinite(Number(result.hitsPerPage))
+        ? Math.max(1, Math.floor(Number(result.hitsPerPage)))
+        : 1,
+      page: Number.isFinite(Number(result.page))
+        ? Math.max(1, Math.floor(Number(result.page)))
+        : 1,
+      offset: Number.isFinite(Number(result.offset))
+        ? Math.max(0, Math.floor(Number(result.offset)))
+        : 0,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The icon import request timed out. Try again.");
+    }
+    throw error instanceof Error
+      ? error
+      : new Error("The icon import request failed.");
+  } finally {
+    window.clearTimeout(timer);
+    activeControllers.delete(controller);
+  }
+}
+
 async function searchIconByShareId(
   primaryApiKey: string,
   backupApiKey: string,
@@ -468,38 +551,65 @@ async function searchIconByShareId(
   const normalizedId = shareId.trim();
   if (!normalizedId) throw new Error("Icon share ID is required.");
 
-  // The value after ?icon= is the macOSicons icon/object ID.
-  // Use the same authenticated search path as normal IconFlow searches.
-  const data = await searchIcons(primaryApiKey, backupApiKey, normalizedId, 1);
+  const primaryKey = primaryApiKey.trim();
+  const backupKey = backupApiKey.trim();
 
-  const exact = data.hits.find((hit) => importHitMatchesId(hit, normalizedId));
-  if (exact) {
-    return {
-      ...data,
-      hits: [exact],
-      totalHits: 1,
-      totalPages: 1,
-    };
+  if (!primaryKey) {
+    throw new Error("Add your primary API key in Settings first.");
   }
 
-  // Some API responses may omit objectID even though the search returned
-  // exactly one matching result. In that case, the single result is the
-  // requested icon.
-  if (data.hits.length === 1 && data.totalHits === 1) {
-    return {
-      ...data,
-      hits: [data.hits[0]],
-      totalHits: 1,
-      totalPages: 1,
-    };
+  const keys = [primaryKey, backupKey]
+    .filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+
+  let lastError: unknown = null;
+
+  for (const key of keys) {
+    try {
+      const data = await requestImportSearch(key, normalizedId);
+
+      // The filter is the authoritative match. Keep a defensive exact-ID
+      // check when objectID is present, but do not reject valid API results
+      // that omit objectID from the response.
+      const exact = data.hits.find((hit) => importHitMatchesId(hit, normalizedId));
+      const hit = exact ?? (data.hits.length === 1 ? data.hits[0] : null);
+
+      if (hit) {
+        return {
+          ...data,
+          hits: [hit],
+          totalHits: 1,
+          totalPages: 1,
+          usedBackup: key === backupKey && key !== primaryKey,
+        };
+      }
+
+      return {
+        ...data,
+        hits: [],
+        totalHits: 0,
+        totalPages: 1,
+        usedBackup: key === backupKey && key !== primaryKey,
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (error instanceof RateLimitError) {
+        rateLimitedUntil.set(key, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+        continue;
+      }
+
+      // Authentication or server errors on the primary should still allow
+      // the configured backup key to be tried.
+      if (key === primaryKey && backupKey && backupKey !== primaryKey) {
+        continue;
+      }
+
+      throw error;
+    }
   }
 
-  return {
-    ...data,
-    hits: [],
-    totalHits: 0,
-    totalPages: 1,
-  };
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("The macOSicons icon could not be resolved.");
 }
 
 export function parseIconImportUrls(text: string): { urls: string[]; invalidCount: number } {
