@@ -460,6 +460,86 @@ function directAssetHit(url: string): IconHit {
   };
 }
 
+async function requestPublicImportSearch(shareId: string): Promise<SearchResponse> {
+  const normalizedId = shareId.trim();
+  if (!normalizedId) throw new Error("Icon share ID is required.");
+
+  await waitForSearchSlot();
+
+  const controller = new AbortController();
+  activeControllers.add(controller);
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("https://macosicons.com/api/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        query: normalizedId,
+        searchOptions: {
+          hitsPerPage: 1,
+          page: 1,
+          filters: ["objectID = " + JSON.stringify(normalizedId)],
+        },
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (response.status === 429) throw new RateLimitError();
+      throw new Error(errorMessage(response.status, body));
+    }
+
+    const hits = Array.isArray(body)
+      ? body
+      : body && typeof body === "object" && Array.isArray((body as Record<string, unknown>).hits)
+        ? (body as Record<string, unknown>).hits
+        : null;
+
+    if (!hits) throw new Error("The public icon search returned an invalid response.");
+
+    const result = body && typeof body === "object" && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : {};
+
+    const totalHits = Number.isFinite(Number(result.totalHits))
+      ? Math.max(0, Math.floor(Number(result.totalHits)))
+      : hits.length;
+
+    return {
+      hits: hits as IconHit[],
+      query: typeof result.query === "string" ? result.query : normalizedId,
+      totalHits,
+      totalPages: Math.max(1, Number.isFinite(Number(result.totalPages))
+        ? Math.floor(Number(result.totalPages))
+        : Math.ceil(totalHits / Math.max(1, hits.length))),
+      hitsPerPage: Number.isFinite(Number(result.hitsPerPage))
+        ? Math.max(1, Math.floor(Number(result.hitsPerPage)))
+        : 1,
+      page: Number.isFinite(Number(result.page))
+        ? Math.max(1, Math.floor(Number(result.page)))
+        : 1,
+      offset: Number.isFinite(Number(result.offset))
+        ? Math.max(0, Math.floor(Number(result.offset)))
+        : 0,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The public icon search request timed out. Try again.");
+    }
+    throw error instanceof Error
+      ? error
+      : new Error("The public icon search request failed.");
+  } finally {
+    window.clearTimeout(timer);
+    activeControllers.delete(controller);
+  }
+}
+
 async function requestImportSearch(apiKey: string, shareId: string): Promise<SearchResponse> {
   const normalizedId = shareId.trim();
   if (!normalizedId) throw new Error("Icon share ID is required.");
@@ -551,12 +631,24 @@ async function searchIconByShareId(
   const normalizedId = shareId.trim();
   if (!normalizedId) throw new Error("Icon share ID is required.");
 
+  // Try the public macOSicons search surface first. Current third-party
+  // clients use this endpoint and it returns the objectID used by share links.
+  try {
+    const publicData = await requestPublicImportSearch(normalizedId);
+    const exact = publicData.hits.find((hit) => importHitMatchesId(hit, normalizedId));
+    if (exact) {
+      return { ...publicData, hits: [exact], totalHits: 1, totalPages: 1, usedBackup: false };
+    }
+    if (publicData.hits.length === 1 && publicData.totalHits === 1) {
+      return { ...publicData, hits: [publicData.hits[0]], totalHits: 1, totalPages: 1, usedBackup: false };
+    }
+  } catch {
+    // Fall through to the documented authenticated API.
+  }
+
   const primaryKey = primaryApiKey.trim();
   const backupKey = backupApiKey.trim();
-
-  if (!primaryKey) {
-    throw new Error("Add your primary API key in Settings first.");
-  }
+  if (!primaryKey) throw new Error("Add your primary API key in Settings first.");
 
   const keys = [primaryKey, backupKey]
     .filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
@@ -566,30 +658,31 @@ async function searchIconByShareId(
   for (const key of keys) {
     try {
       const data = await requestImportSearch(key, normalizedId);
-
-      // The filter is the authoritative match. Keep a defensive exact-ID
-      // check when objectID is present, but do not reject valid API results
-      // that omit objectID from the response.
       const exact = data.hits.find((hit) => importHitMatchesId(hit, normalizedId));
-      const hit = exact ?? (data.hits.length === 1 ? data.hits[0] : null);
 
-      if (hit) {
+      if (exact) {
         return {
           ...data,
-          hits: [hit],
+          hits: [exact],
           totalHits: 1,
           totalPages: 1,
           usedBackup: key === backupKey && key !== primaryKey,
         };
       }
 
-      return {
-        ...data,
-        hits: [],
-        totalHits: 0,
-        totalPages: 1,
-        usedBackup: key === backupKey && key !== primaryKey,
-      };
+      if (data.hits.length === 1 && data.totalHits === 1) {
+        return {
+          ...data,
+          hits: [data.hits[0]],
+          totalHits: 1,
+          totalPages: 1,
+          usedBackup: key === backupKey && key !== primaryKey,
+        };
+      }
+
+      // A valid zero-result response should not prevent the backup key from
+      // being tried.
+      lastError = null;
     } catch (error) {
       lastError = error;
 
@@ -598,8 +691,6 @@ async function searchIconByShareId(
         continue;
       }
 
-      // Authentication or server errors on the primary should still allow
-      // the configured backup key to be tried.
       if (key === primaryKey && backupKey && backupKey !== primaryKey) {
         continue;
       }
@@ -609,7 +700,17 @@ async function searchIconByShareId(
   }
 
   if (lastError instanceof Error) throw lastError;
-  throw new Error("The macOSicons icon could not be resolved.");
+
+  return {
+    hits: [],
+    query: normalizedId,
+    totalHits: 0,
+    totalPages: 1,
+    hitsPerPage: 1,
+    page: 1,
+    offset: 0,
+    usedBackup: false,
+  };
 }
 
 export function parseIconImportUrls(text: string): { urls: string[]; invalidCount: number } {
