@@ -280,7 +280,9 @@ function App() {
   }
 
   async function openPreview(hit: IconHit) {
-    const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+    // macOSicons publishes a dedicated low-resolution PNG for the page preview.
+    // Use that when available so the preview matches the source page exactly.
+    const sourceUrl = hit.lowResPngUrl || hit.icnsUrl;
     if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
     const previousUrl = preview?.url;
@@ -291,12 +293,12 @@ function App() {
 
     try {
       let url: string;
-      if (hit.icnsUrl) {
-        const buffer = await fetchIcns(hit.icnsUrl);
-        url = await previewUrl(buffer);
-      } else {
-        const asset = await fetchImageAsset(hit.lowResPngUrl!);
+      if (hit.lowResPngUrl) {
+        const asset = await fetchImageAsset(hit.lowResPngUrl);
         url = URL.createObjectURL(new Blob([asset.buffer], { type: asset.mimeType }));
+      } else {
+        const buffer = await fetchIcns(hit.icnsUrl!);
+        url = await previewUrl(buffer);
       }
 
       if (generation !== previewGeneration.current) {
