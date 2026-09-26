@@ -274,37 +274,27 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 
 
 .pagination {
-  width: min(620px, 100%);
+  width: min(760px, 100%);
   min-height: 58px;
   margin: 24px auto 8px;
-  padding: 7px;
-  display: grid;
-  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr);
+  padding: 8px 14px;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
   border-radius: 18px;
 }
-.pagination .secondary-button {
-  min-width: 118px;
+.pagination .primary-button {
+  min-width: 268px;
   min-height: 42px;
-}
-.pagination .secondary-button:first-child {
-  justify-self: end;
-}
-.pagination .secondary-button:last-child {
-  justify-self: start;
-}
-.pagination .secondary-button:disabled {
-  opacity: .42;
-  cursor: not-allowed;
+  justify-content: center;
 }
 .pagination-status {
-  min-width: 150px;
   min-height: 42px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   color: var(--muted);
   font-size: 12px;
   text-align: center;
@@ -316,17 +306,16 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 
 @media (max-width: 520px) {
   .pagination {
-    grid-template-columns: minmax(82px, 1fr) auto minmax(82px, 1fr);
-    gap: 7px;
+    padding: 8px 10px;
+    gap: 8px 10px;
   }
-  .pagination .secondary-button {
-    min-width: 82px;
+  .pagination .primary-button {
+    width: min(100%, 300px);
+    min-width: 0;
     min-height: 40px;
-    padding: 0 10px;
   }
   .pagination-status {
-    min-width: 105px;
-    min-height: 40px;
+    min-height: 32px;
     font-size: 11px;
   }
 }
