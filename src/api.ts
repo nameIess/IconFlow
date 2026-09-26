@@ -25,9 +25,13 @@ const API_BASE = "https://api.macosicons.com/api/v1";
 export const SEARCH_PAGE_SIZE = 50;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MIN_SEARCH_INTERVAL_MS = 550;
-const SEARCH_CACHE_TTL_MS = 120_000;
+const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const PERSISTED_CACHE_KEY = "iconflow.searchCache.v2";
+const MAX_PERSISTED_CACHE_ENTRIES = 20;
 
-const searchCache = new Map<string, { expiresAt: number; data: SearchResponse }>();
+type CacheEntry = { expiresAt: number; data: SearchResponse };
+const searchCache = new Map<string, CacheEntry>();
+let persistentCacheLoaded = false;
 const inFlight = new Map<string, Promise<SearchResponse>>();
 let lastSearchStartedAt = 0;
 
@@ -35,11 +39,60 @@ function cacheKey(query: string, page: number): string {
   return JSON.stringify([query, page, SEARCH_PAGE_SIZE]);
 }
 
+function loadPersistentCache(): void {
+  if (persistentCacheLoaded) return;
+  persistentCacheLoaded = true;
+
+  try {
+    const raw = localStorage.getItem(PERSISTED_CACHE_KEY);
+    if (!raw) return;
+
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+
+    const now = Date.now();
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const entry = item as { key?: unknown; expiresAt?: unknown; data?: unknown };
+      if (
+        typeof entry.key !== "string" ||
+        typeof entry.expiresAt !== "number" ||
+        !entry.data ||
+        entry.expiresAt <= now
+      ) continue;
+
+      const data = entry.data as SearchResponse;
+      if (!Array.isArray(data.hits)) continue;
+      searchCache.set(entry.key, { expiresAt: entry.expiresAt, data });
+    }
+  } catch {
+    try { localStorage.removeItem(PERSISTED_CACHE_KEY); } catch {}
+  }
+}
+
+function persistSearchCache(): void {
+  try {
+    const now = Date.now();
+    const entries = [...searchCache.entries()]
+      .filter(([, entry]) => entry.expiresAt > now)
+      .sort((a, b) => b[1].expiresAt - a[1].expiresAt)
+      .slice(0, MAX_PERSISTED_CACHE_ENTRIES)
+      .map(([key, entry]) => ({ key, expiresAt: entry.expiresAt, data: entry.data }));
+
+    localStorage.setItem(PERSISTED_CACHE_KEY, JSON.stringify(entries));
+  } catch {
+    // Search still works when browser storage is unavailable or full.
+  }
+}
+
 function getCached(key: string): SearchResponse | null {
+  loadPersistentCache();
+
   const entry = searchCache.get(key);
   if (!entry) return null;
   if (entry.expiresAt <= Date.now()) {
     searchCache.delete(key);
+    persistSearchCache();
     return null;
   }
   return entry.data;
@@ -132,6 +185,7 @@ export async function searchIcons(apiKey: string, query: string, page = 1): Prom
   const request = requestSearch(key, normalizedQuery, normalizedPage)
     .then((data) => {
       searchCache.set(keyForCache, { expiresAt: Date.now() + SEARCH_CACHE_TTL_MS, data });
+      persistSearchCache();
       return data;
     })
     .finally(() => inFlight.delete(keyForCache));
@@ -143,6 +197,8 @@ export async function searchIcons(apiKey: string, query: string, page = 1): Prom
 export function clearSearchCache(): void {
   searchCache.clear();
   inFlight.clear();
+  persistentCacheLoaded = true;
+  try { localStorage.removeItem(PERSISTED_CACHE_KEY); } catch {}
 }
 
 export async function fetchIcns(url: string, downloadApiKey: string): Promise<ArrayBuffer> {
