@@ -386,10 +386,26 @@ function normalizedImportUrl(value: string): string | null {
 function iconIdFromImportUrl(value: string): string | null {
   const url = parseUrlCandidate(value);
   if (!url) return null;
+
   const host = url.hostname.toLowerCase();
-  return host === MACOSICONS_HOST || host === MACOSICONS_WWW_HOST
-    ? url.searchParams.get("icon")?.trim() || null
-    : null;
+  if (host !== MACOSICONS_HOST && host !== MACOSICONS_WWW_HOST) return null;
+
+  // macOSicons share links use a hash route:
+  // https://macosicons.com/#/?icon=<id>
+  // Keep supporting the older direct-query form too.
+  const directId = url.searchParams.get("icon")?.trim();
+  if (directId) return directId;
+
+  const hash = url.hash.replace(/^#/, "");
+  if (!hash) return null;
+
+  try {
+    const hashUrl = new URL(hash.startsWith("?") ? `https://macosicons.com/${hash}` : `https://macosicons.com/${hash}`);
+    return hashUrl.searchParams.get("icon")?.trim() || null;
+  } catch {
+    const match = hash.match(/[?&]icon=([^&#]+)/i);
+    return match ? decodeURIComponent(match[1]).trim() : null;
+  }
 }
 
 function scoreImportedHit(hit: IconHit, iconId: string): number {
