@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
-import { clearSearchCache, fetchIcns, isTrustedImageUrl, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
-import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
+import { ChevronDown, Download, ExternalLink, KeyRound, Link2, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, Upload, X } from "lucide-react";
+import { clearSearchCache, fetchIcns, fetchImageAsset, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
+import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl, zipFiles } from "./converter";
 
 type Format = "png" | "ico";
 const PRIMARY_KEY = "iconflow.primaryApiKey";
@@ -64,8 +64,16 @@ function App() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importUrl, setImportUrl] = useState("");
+  const [importLoading, setImportLoading] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const importModalFileRef = useRef<HTMLInputElement>(null);
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
 
@@ -107,6 +115,7 @@ function App() {
     setTotalPages(data.totalPages);
     setActiveQuery(searchValue);
     setFormatById({});
+    setSelectedIds(new Set());
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -131,6 +140,58 @@ function App() {
       setToast(error instanceof Error ? error.message : "Search failed.");
     } finally {
       if (generation === requestGeneration.current) setLoading(false);
+    }
+  }
+
+  async function importUrls(urls: string[]) {
+    setImportLoading(true);
+    try {
+      const data = await importIconUrls(urls);
+      if (data.hits.length) {
+        setResults((current) => mergeUniqueHits(current, data.hits));
+        setTotal((current) => current + data.hits.length);
+        setActiveQuery("Imported icons");
+        setPage(1);
+        setTotalPages(1);
+        setFormatById({});
+        setSelectedIds(new Set());
+        setImportOpen(false);
+
+        const failedText = data.failed.length ? ` ${data.failed.length} link(s) could not be resolved.` : "";
+        const backupText = data.usedBackup ? " Backup API key was used." : "";
+        setToast(`Imported ${data.hits.length} icon(s).${failedText}${backupText}`);
+      } else {
+        setToast(data.failed.length ? `Imported 0 icon(s); ${data.failed.length} link(s) could not be resolved.` : "No supported icon links were found.");
+      }
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Icon import failed.");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function importFromText() {
+    const parsed = parseIconImportText(importUrl);
+    if (!parsed.urls.length) {
+      setToast("Paste a macOSicons URL or supported ICNS URL.");
+      return;
+    }
+    await importUrls(parsed.urls);
+  }
+
+  async function importFromFile(file: File) {
+    try {
+      const text = await file.text();
+      const parsed = parseIconImportText(text);
+      if (!parsed.urls.length) {
+        setToast("The text file contains no supported icon URLs.");
+        return;
+      }
+      await importUrls(parsed.urls);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Unable to read the text file.");
+    } finally {
+      if (importFileRef.current) importFileRef.current.value = "";
     }
   }
 
@@ -222,7 +283,10 @@ function App() {
   }
 
   async function openPreview(hit: IconHit) {
-    if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
+    // macOSicons publishes a dedicated low-resolution PNG for the page preview.
+    // Use that when available so the preview matches the source page exactly.
+    const sourceUrl = hit.lowResPngUrl || hit.icnsUrl;
+    if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
     const previousUrl = preview?.url;
     if (previousUrl) URL.revokeObjectURL(previousUrl);
@@ -231,10 +295,15 @@ function App() {
     setPreview({ hit, loading: true });
 
     try {
-      const buffer = await fetchIcns(hit.icnsUrl);
-      if (generation !== previewGeneration.current) return;
+      let url: string;
+      if (hit.lowResPngUrl) {
+        const asset = await fetchImageAsset(hit.lowResPngUrl);
+        url = URL.createObjectURL(new Blob([asset.buffer], { type: asset.mimeType }));
+      } else {
+        const buffer = await fetchIcns(hit.icnsUrl!);
+        url = await previewUrl(buffer);
+      }
 
-      const url = await previewUrl(buffer);
       if (generation !== previewGeneration.current) {
         URL.revokeObjectURL(url);
         return;
@@ -249,20 +318,109 @@ function App() {
   }
 
   async function downloadIcon(hit: IconHit, format: Format) {
-    if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
+    const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+    if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
-    const id = hit.objectID || hit.icnsUrl || hit.appName;
+    const id = hitId(hit);
     setBusyId(id);
     setMenuId(null);
     try {
-      const buffer = await fetchIcns(hit.icnsUrl);
-      const blob = format === "ico" ? await icnsToIco(buffer) : await icnsToPng(buffer);
+      const blob = hit.icnsUrl
+        ? (format === "ico"
+          ? await icnsToIco(await fetchIcns(hit.icnsUrl))
+          : await icnsToPng(await fetchIcns(hit.icnsUrl)))
+        : (format === "ico"
+          ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
+          : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
       download(blob, filename(hit.appName, format));
       setToast(`${hit.appName} downloaded as ${format.toUpperCase()}.`);
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Download failed.");
     } finally {
       setBusyId(null);
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const allSelected = results.length > 0 && results.every((hit, index) => selectedIds.has(hitId(hit, index)));
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+
+    setSelectedIds(new Set(results.map((hit, index) => hitId(hit, index))));
+  }
+
+  function uniqueZipFilename(name: string, used: Set<string>): string {
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+
+    const dot = name.lastIndexOf(".");
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const extension = dot > 0 ? name.slice(dot) : "";
+    let suffix = 2;
+    let candidate = `${base} (${suffix})${extension}`;
+    while (used.has(candidate)) {
+      suffix += 1;
+      candidate = `${base} (${suffix})${extension}`;
+    }
+    used.add(candidate);
+    return candidate;
+  }
+
+  async function downloadSelected() {
+    const selected = results.filter((hit, index) => selectedIds.has(hitId(hit, index)));
+    if (!selected.length) return setToast("Select at least one icon first.");
+
+    setBulkDownloading(true);
+    setBulkProgress(0);
+    setMenuId(null);
+
+    try {
+      const files: { name: string; blob: Blob }[] = [];
+      const usedNames = new Set<string>();
+
+      for (let index = 0; index < selected.length; index += 1) {
+        const hit = selected[index];
+        const id = hitId(hit, results.indexOf(hit));
+        const format = formatById[id] || "ico";
+        const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+        if (!sourceUrl) throw new Error(`No downloadable asset was found for ${hit.appName}.`);
+
+        const blob = hit.icnsUrl
+          ? (format === "ico"
+            ? await icnsToIco(await fetchIcns(hit.icnsUrl))
+            : await icnsToPng(await fetchIcns(hit.icnsUrl)))
+          : (format === "ico"
+            ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
+            : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
+
+        files.push({
+          name: uniqueZipFilename(filename(hit.appName, format), usedNames),
+          blob,
+        });
+        setBulkProgress(index + 1);
+      }
+
+      const archive = await zipFiles(files);
+      download(archive, `iconflow-icons-${new Date().toISOString().slice(0, 10)}.zip`);
+      setSelectedIds(new Set());
+      setToast(`Downloaded ${selected.length} icon(s) as one ZIP file.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Bulk download failed.");
+    } finally {
+      setBulkDownloading(false);
+      setBulkProgress(0);
     }
   }
 
@@ -285,15 +443,46 @@ function App() {
           <div className="eyebrow"><span className="status-dot" /> Browser-native icon workflow</div>
           <h1>Find the icon.<br /><span>Make it yours.</span></h1>
           <p>Search macOS icons in fixed 50-result pages, then preview or convert the original ICNS locally into PNG or Windows-ready ICO.</p>
-          <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-            <Search size={20} className="search-leading" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
-            <button className="search-submit" type="submit" disabled={loading || pageLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
-          </form>
+          <div className="search-stack">
+            <form className="search-panel glass" onSubmit={(event) => { event.preventDefault(); void search(); }}>
+              <Search size={20} className="search-leading" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search macOS icons…" aria-label="Search macOS icons" maxLength={100} />
+              <button className="search-submit" type="submit" disabled={loading || pageLoading || importLoading}>{loading ? <LoaderCircle className="spin" size={18} /> : <Search size={18} />}<span className="search-label">Search</span></button>
+            </form>
+            <div className="import-actions">
+              <button type="button" className="import-button glass" onClick={() => setImportOpen(true)} disabled={loading || pageLoading || importLoading}>
+                <Download size={15} /> Import icons from URL or TXT
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".txt,text/plain"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.currentTarget.value = "";
+                  if (file) void importFromFile(file);
+                }}
+              />
+            </div>
+          </div>
           <div className="hero-meta"><span><ShieldCheck size={15} /> Primary + backup API keys, stored only in this browser</span><span><span className="kbd">Enter</span> to search</span></div>
         </section>
 
         <section className="results-section">
+          {results.length > 0 && <div className="selection-bar glass">
+            <button className="secondary-button" onClick={toggleSelectAll} disabled={bulkDownloading}>
+              {results.length > 0 && results.every((hit, index) => selectedIds.has(hitId(hit, index))) ? "Clear all" : `Select all loaded (${results.length})`}
+            </button>
+            {selectedIds.size > 0 && <>
+              <span>{bulkDownloading ? `Preparing ${bulkProgress}/${selectedIds.size}…` : `${selectedIds.size} selected`}</span>
+              <button className="primary-button" onClick={() => void downloadSelected()} disabled={bulkDownloading || Boolean(busyId)}>
+                {bulkDownloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
+              </button>
+              <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={bulkDownloading}>Clear</button>
+            </>}
+          </div>}
           <div className="results-header">
             <div><span className="section-kicker">{results.length ? "Search results" : "Explore"}</span><h2>{results.length ? activeQuery : "Your icon shelf"}</h2></div>
             {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} loaded</span>}
@@ -307,17 +496,18 @@ function App() {
                 {results.map((hit, index) => {
                   const id = hitId(hit, index);
                   const format = formatById[id] || "ico";
-                  const busy = busyId === id;
+                  const busy = busyId === id || bulkDownloading;
                   const imageUrl = isTrustedImageUrl(hit.lowResPngUrl) ? hit.lowResPngUrl : undefined;
 
                   return (
-                    <article className="icon-card glass" key={id}>
+                    <article className={`icon-card glass${selectedIds.has(id) ? " selected" : ""}`} key={id}>
                       <button className="preview-button" onClick={() => void openPreview(hit)} aria-label={`Preview ${hit.appName}`}>
                         <div className="icon-art">{imageUrl ? <img src={imageUrl} alt="" loading="lazy" decoding="async" /> : <IconMark className="fallback-icon" />}</div>
                         <span className="preview-hint">Preview ICNS</span>
                       </button>
                       <div className="card-body">
                         <div className="card-title-row">
+                          <label className="select-icon"><input type="checkbox" checked={selectedIds.has(id)} onChange={() => toggleSelected(id)} aria-label={`Select ${hit.appName}`} /><span /></label>
                           <div><h3 title={hit.appName}>{hit.appName}</h3><p>{hit.category || "macOS icon"}</p></div>
                           <div className="format-menu">
                             <button className="small-button" onClick={() => setMenuId(menuId === id ? null : id)}>{format.toUpperCase()} <ChevronDown size={13} /></button>
@@ -354,6 +544,23 @@ function App() {
 
       <footer><span>IconFlow</span><span>Icons and creator attribution provided by macOSicons.</span><a href="https://macosicons.com" target="_blank" rel="noopener noreferrer">macOSicons <ExternalLink size={12} /></a></footer>
       {toast && <div className="toast glass" role="status">{toast}</div>}
+
+      {importOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !importLoading) setImportOpen(false); }}>
+        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="import-title">
+          <div className="modal-heading">
+            <div><span className="section-kicker">Import icons</span><h2 id="import-title">URL or text file</h2></div>
+            <button className="icon-button" disabled={importLoading} onClick={() => setImportOpen(false)} aria-label="Close import"><X size={18} /></button>
+          </div>
+          <p>Paste one macOSicons share URL or upload a .txt file. IconFlow reads the shared page, previews the actual icon, and lets you choose exactly which icons to download. No search API request is used for imports.</p>
+          <label className="field-label" htmlFor="import-url">Icon URL</label>
+          <div className="key-input"><ExternalLink size={17} /><input id="import-url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://macosicons.com/?icon=Ic1LCu7E7f" disabled={importLoading} /></div>
+          <div className="modal-actions">
+            <button className="secondary-button" disabled={importLoading} onClick={() => importModalFileRef.current?.click()}>Choose .txt file</button>
+            <input ref={importModalFileRef} type="file" accept=".txt,text/plain" hidden onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void importFromFile(file); }} />
+            <button className="primary-button" disabled={importLoading || !importUrl.trim()} onClick={() => void importFromText()}>{importLoading ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />} {importLoading ? "Importing…" : "Import URL"}</button>
+          </div>
+        </section>
+      </div>}
 
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
         <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">

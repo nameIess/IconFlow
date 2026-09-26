@@ -184,7 +184,12 @@ function nonNegativeInteger(value: unknown): number | null {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
-async function requestSearch(apiKey: string, query: string, page: number): Promise<SearchResponse> {
+async function requestSearch(
+  apiKey: string,
+  query: string,
+  page: number,
+  filters: string[] = [],
+): Promise<SearchResponse> {
   await waitForSearchSlot();
 
   const controller = new AbortController();
@@ -204,6 +209,7 @@ async function requestSearch(apiKey: string, query: string, page: number): Promi
           hitsPerPage: SEARCH_PAGE_SIZE,
           page,
           offset: (page - 1) * SEARCH_PAGE_SIZE,
+          ...(filters.length ? { filters } : {}),
         },
       }),
       signal: controller.signal,
@@ -343,6 +349,171 @@ export async function searchIcons(
   return request;
 }
 
+export type ImportedIconResult = {
+  hits: IconHit[];
+  failed: string[];
+  usedBackup: boolean;
+};
+
+const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
+
+function parseImportUrl(value: string): URL | null {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function shareIdFromUrl(value: string): string | null {
+  const url = parseImportUrl(value);
+  if (!url || !MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) return null;
+
+  const queryId = url.searchParams.get("icon")?.trim();
+  if (queryId) return queryId;
+
+  const hash = url.hash.replace(/^#/, "");
+  if (hash) {
+    try {
+      const hashUrl = new URL(hash.startsWith("/") ? hash : "/" + hash, url.origin);
+      const hashId = hashUrl.searchParams.get("icon")?.trim();
+      if (hashId) return hashId;
+    } catch {}
+  }
+
+  const lastSegment = url.pathname.split("/").filter(Boolean).at(-1) || "";
+  const match = lastSegment.match(/-([A-Za-z0-9]{8,})$/);
+  return match?.[1] || null;
+}
+
+function importHitMatchesId(hit: IconHit, id: string): boolean {
+  const target = id.trim().toLowerCase();
+  if (!target) return false;
+
+  const candidateValues = Object.values(hit)
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.toLowerCase());
+
+  return candidateValues.some((value) => value.includes(target));
+}
+
+async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: string; previewUrl?: string }> {
+  const endpoint = `/api/resolve-icon?url=${encodeURIComponent(url)}`;
+  const response = await fetch(endpoint, { cache: "no-store" });
+  const body: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body
+      ? (body as { error?: unknown }).error
+      : null;
+    throw new Error(typeof message === "string" ? message : "Unable to resolve the macOSicons share URL.");
+  }
+
+  if (!body || typeof body !== "object" || typeof (body as { assetUrl?: unknown }).assetUrl !== "string") {
+    throw new Error("The macOSicons resolver returned no downloadable icon.");
+  }
+
+  const value = body as { assetUrl: string; previewUrl?: unknown };
+  return {
+    assetUrl: value.assetUrl,
+    previewUrl: typeof value.previewUrl === "string" ? value.previewUrl : undefined,
+  };
+}
+
+export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  let invalidCount = 0;
+
+  for (const line of text.split(/\r?\n/)) {
+    const value = line.trim();
+    if (!value) continue;
+
+    const candidates = value.match(/https:\/\/[^\s<>"']+/gi) || [value];
+    let added = false;
+
+    for (const raw of candidates) {
+      const cleaned = raw.replace(/[),.;]+$/, "");
+      const url = parseImportUrl(cleaned);
+      if (!url) continue;
+
+      const host = url.hostname.toLowerCase();
+      const supported = MACOSICONS_HOSTS.has(host) ||
+        (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname));
+
+      if (!supported) continue;
+
+      const normalized = url.toString();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        urls.push(normalized);
+      }
+      added = true;
+    }
+
+    if (!added) invalidCount += 1;
+    if (urls.length >= 100) break;
+  }
+
+  return { urls: urls.slice(0, 100), invalidCount };
+}
+
+export async function importIconUrls(urls: string[]): Promise<ImportedIconResult> {
+  const hits: IconHit[] = [];
+  const failed: string[] = [];
+
+  for (const raw of urls.slice(0, 100)) {
+    const url = parseImportUrl(raw);
+    if (!url) {
+      failed.push(raw);
+      continue;
+    }
+
+    try {
+      let assetUrl = url.toString();
+      let previewAssetUrl: string | undefined;
+
+      if (MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) {
+        const resolved = await resolveMacosiconsShareUrl(assetUrl);
+        assetUrl = resolved.assetUrl;
+        previewAssetUrl = resolved.previewUrl;
+      } else if (!(url.hostname.toLowerCase() === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname))) {
+        failed.push(raw);
+        continue;
+      }
+
+      const asset = new URL(assetUrl);
+      const isIcns = /\.icns(?:$|[?#])/i.test(asset.pathname);
+      const isImage = /\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(asset.pathname);
+      if (asset.protocol !== "https:" || asset.hostname.toLowerCase() !== "s3-new.macosicons.com" || (!isIcns && !isImage)) {
+        failed.push(raw);
+        continue;
+      }
+
+      if (previewAssetUrl && !isTrustedImageUrl(previewAssetUrl)) {
+        throw new Error("The macOSicons resolver returned an untrusted preview URL.");
+      }
+
+      const name = decodeURIComponent(asset.pathname.split("/").filter(Boolean).pop() || "Imported icon")
+        .replace(/\.(?:icns|png|jpe?g|webp)$/i, "")
+        .replace(/[-_]+/g, " ")
+        .trim();
+
+      hits.push({
+        appName: name || "Imported icon",
+        icnsUrl: isIcns ? asset.toString() : undefined,
+        lowResPngUrl: previewAssetUrl || (isImage ? asset.toString() : undefined),
+        objectID: raw,
+      });
+    } catch {
+      failed.push(raw);
+    }
+  }
+
+  return { hits, failed, usedBackup: false };
+}
+
 export function clearSearchCache(): void {
   cacheGeneration += 1;
   searchCache.clear();
@@ -399,6 +570,20 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
+  if (!isTrustedImageUrl(url)) throw new Error("Blocked untrusted icon source.");
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!isTrustedImageUrl(response.url)) throw new Error("The icon source redirected to an untrusted host.");
+  if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
+
+  const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
+  if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
+  return { buffer, mimeType };
 }
 
 export function isTrustedImageUrl(value?: string): value is string {
