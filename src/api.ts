@@ -415,11 +415,13 @@ async function requestPublicImport(id: string): Promise<IconHit | null> {
     if (!response.ok) return null;
 
     const body: unknown = await response.json().catch(() => null);
-    const hits: unknown[] = Array.isArray(body)
-      ? body
-      : body !== null && typeof body === "object" && Array.isArray((body as Record<string, unknown>).hits)
-        ? (body as Record<string, unknown>).hits
-        : [];
+    let hits: unknown[] = [];
+    if (Array.isArray(body)) {
+      hits = body;
+    } else if (body !== null && typeof body === "object") {
+      const maybeHits = (body as Record<string, unknown>).hits;
+      if (Array.isArray(maybeHits)) hits = maybeHits;
+    }
 
     const candidate = hits.find((item): item is IconHit => {
       if (!item || typeof item !== "object") return false;
