@@ -21,6 +21,10 @@ export type SearchResponse = {
   offset: number;
 };
 
+export const MAX_IMPORT_URLS = 100;
+const MACOSICONS_HOST = "macosicons.com";
+const MACOSICONS_WWW_HOST = "www.macosicons.com";
+
 const API_BASE = "https://api.macosicons.com/api/v1";
 const REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_PAGE_SIZE = 50;
@@ -341,6 +345,104 @@ export async function searchIcons(
 
   inFlight.set(inFlightKey, request);
   return request;
+}
+
+
+export type ImportedIconResult = {
+  hits: IconHit[];
+  failed: string[];
+  usedBackup: boolean;
+};
+
+function normalizedImportUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.toLowerCase();
+    if (host === MACOSICONS_HOST || host === MACOSICONS_WWW_HOST) {
+      const iconId = url.searchParams.get("icon")?.trim();
+      return iconId ? url.toString() : null;
+    }
+    if (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
+      return url.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseIconImportUrls(text: string): { urls: string[]; invalidCount: number } {
+  const matches = text.match(/https:\/\/[^\s<>"']+/gi) ?? [];
+  const seen = new Set<string>();
+  const urls: string[] = [];
+
+  for (const raw of matches) {
+    const cleaned = raw.replace(/[),.;]+$/, "");
+    const normalized = normalizedImportUrl(cleaned);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    urls.push(normalized);
+    if (urls.length >= MAX_IMPORT_URLS) break;
+  }
+
+  return { urls, invalidCount: Math.max(0, matches.length - urls.length) };
+}
+
+function directAssetHit(url: string): IconHit {
+  const parsed = new URL(url);
+  const rawName = decodeURIComponent(parsed.pathname.split("/").pop() || "icon")
+    .replace(/\.icns$/i, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
+  return {
+    appName: rawName || "Imported icon",
+    icnsUrl: parsed.toString(),
+    objectID: parsed.toString(),
+    category: "Imported icon",
+  };
+}
+
+export async function importIconUrls(
+  primaryApiKey: string,
+  backupApiKey: string,
+  urls: string[],
+): Promise<ImportedIconResult> {
+  const normalizedUrls = [...new Set(urls.map(normalizedImportUrl).filter((value): value is string => Boolean(value)))]
+    .slice(0, MAX_IMPORT_URLS);
+  if (!normalizedUrls.length) throw new Error("No supported icon URLs were found.");
+  if (!primaryApiKey.trim()) throw new Error("Add your primary API key in Settings first.");
+
+  const hits: IconHit[] = [];
+  const failed: string[] = [];
+  let usedBackup = false;
+
+  for (const url of normalizedUrls) {
+    const parsed = new URL(url);
+    if (parsed.hostname.toLowerCase() === "s3-new.macosicons.com") {
+      hits.push(directAssetHit(url));
+      continue;
+    }
+
+    const iconId = parsed.searchParams.get("icon")?.trim();
+    if (!iconId) {
+      failed.push(url);
+      continue;
+    }
+
+    try {
+      const data = await searchIcons(primaryApiKey, backupApiKey, iconId, 1);
+      usedBackup = usedBackup || data.usedBackup;
+      const exact = data.hits.find((hit) => hit.objectID === iconId || hit.objectID === url);
+      if (exact) hits.push(exact);
+      else if (data.hits.length === 1) hits.push(data.hits[0]);
+      else failed.push(url);
+    } catch {
+      failed.push(url);
+    }
+  }
+
+  return { hits, failed, usedBackup };
 }
 
 export function clearSearchCache(): void {

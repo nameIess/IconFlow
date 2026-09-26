@@ -330,3 +330,14 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
     font-size: 11px;
   }
 }
+
+
+.search-stack { width: min(760px, 100%); margin: 0 auto; }
+.import-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.import-button { border: 1px solid var(--border); color: var(--muted); border-radius: 11px; padding: 8px 11px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+.import-button:hover { color: var(--text); border-color: var(--border-strong); background: var(--panel-strong); }
+.import-button:disabled { opacity: .5; cursor: wait; }
+.import-or { margin-top: 14px; color: var(--muted-2); font-size: 10px; text-align: center; }
+.import-file-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 9px; color: var(--muted-2); font-size: 10px; }
+.import-file-row .secondary-button { min-height: 38px; }
+@media (max-width: 520px) { .import-actions { flex-direction: column; } .import-button { justify-content: center; width: 100%; } .import-file-row { align-items: stretch; flex-direction: column; } }
