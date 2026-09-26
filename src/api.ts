@@ -26,7 +26,6 @@ export type SearchResponse = {
 };
 
 const API_BASE = "https://api.macosicons.com/api/v1";
-const SITE_SEARCH_ENDPOINT = "https://macosicons.com/api/search";
 export const MAX_IMPORT_URLS = 100;
 const MACOSICONS_HOST = "macosicons.com";
 const MACOSICONS_WWW_HOST = "www.macosicons.com";
@@ -461,24 +460,29 @@ function directAssetHit(url: string): IconHit {
   };
 }
 
-async function requestSiteSearchByShareId(shareId: string): Promise<IconHit | null> {
+async function requestLegacyShareSearch(apiKey: string, shareId: string): Promise<IconHit | null> {
   const normalizedId = shareId.trim();
-  if (!normalizedId) throw new Error("Icon share ID is required.");
+  if (!normalizedId) return null;
+
+  await waitForSearchSlot();
 
   const controller = new AbortController();
+  activeControllers.add(controller);
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(SITE_SEARCH_ENDPOINT, {
+    const response = await fetch("https://api.macosicons.com/api/search", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
       body: JSON.stringify({
-        query: "",
+        query: normalizedId,
         searchOptions: {
-          filters: [`objectID = ${JSON.stringify(normalizedId)}`],
           hitsPerPage: 1,
-          page: 1,
           sort: ["timeStamp:desc"],
+          page: 1,
         },
       }),
       signal: controller.signal,
@@ -486,35 +490,29 @@ async function requestSiteSearchByShareId(shareId: string): Promise<IconHit | nu
     });
 
     const body: unknown = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(errorMessage(response.status, body));
-    if (!body || typeof body !== "object") {
-      throw new Error("macOSicons returned an invalid share-link response.");
+    if (!response.ok) {
+      if (response.status === 429) throw new RateLimitError();
+      throw new Error(errorMessage(response.status, body));
     }
 
+    if (!body || typeof body !== "object") return null;
     const result = body as Record<string, unknown>;
-    if (!Array.isArray(result.hits)) {
-      throw new Error("macOSicons returned no icon list for the share link.");
-    }
+    if (!Array.isArray(result.hits)) return null;
 
     const hit = result.hits.find(
       (candidate): candidate is IconHit =>
-        Boolean(
-          candidate &&
-          typeof candidate === "object" &&
-          importHitMatchesId(candidate as IconHit, normalizedId),
-        ),
+        Boolean(candidate && typeof candidate === "object" && importHitMatchesId(candidate as IconHit, normalizedId)),
     );
 
-    return hit ?? null;
+    return hit ?? (result.hits.length === 1 ? result.hits[0] as IconHit : null);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new Error("The macOSicons share-link lookup timed out.");
     }
-    throw error instanceof Error
-      ? error
-      : new Error("The macOSicons share-link lookup failed.");
+    throw error instanceof Error ? error : new Error("The macOSicons share-link lookup failed.");
   } finally {
     window.clearTimeout(timer);
+    activeControllers.delete(controller);
   }
 }
 
@@ -526,35 +524,54 @@ async function searchIconByShareId(
   const normalizedId = shareId.trim();
   if (!normalizedId) throw new Error("Icon share ID is required.");
 
-  try {
-    const siteHit = await requestSiteSearchByShareId(normalizedId);
-    if (siteHit) {
-      return {
-        hits: [siteHit],
-        query: normalizedId,
-        totalHits: 1,
-        totalPages: 1,
-        hitsPerPage: 1,
-        page: 1,
-        offset: 0,
-        usedBackup: false,
-      };
+  const keys = [primaryApiKey.trim(), backupApiKey.trim()]
+    .filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+
+  if (!keys.length) {
+    throw new Error("Add a primary API key in Settings first.");
+  }
+
+  let lastError: unknown = null;
+  for (const key of keys) {
+    try {
+      const legacyHit = await requestLegacyShareSearch(key, normalizedId);
+      if (legacyHit) {
+        return {
+          hits: [legacyHit],
+          query: normalizedId,
+          totalHits: 1,
+          totalPages: 1,
+          hitsPerPage: 1,
+          page: 1,
+          offset: 0,
+          usedBackup: key !== primaryApiKey.trim(),
+        };
+      }
+    } catch (error) {
+      lastError = error;
+      if (error instanceof RateLimitError) {
+        rateLimitedUntil.set(key, Date.now() + RATE_LIMIT_COOLDOWN_MS);
+        continue;
+      }
     }
-  } catch {
-    // Fall through to the authenticated API fallback below.
   }
 
-  if (!primaryApiKey.trim()) {
-    throw new Error("The public share-link resolver could not find this icon. Add a primary API key and try again.");
+  try {
+    const data = await searchIcons(primaryApiKey, backupApiKey, normalizedId, 1);
+    const exact = data.hits.find((hit) => importHitMatchesId(hit, normalizedId));
+    if (exact) {
+      return { ...data, hits: [exact], totalHits: 1, totalPages: 1 };
+    }
+    if (data.hits.length === 1 && data.totalHits === 1) {
+      return { ...data, hits: [data.hits[0]], totalHits: 1, totalPages: 1 };
+    }
+    return { ...data, hits: [] };
+  } catch (error) {
+    lastError = error;
   }
 
-  const data = await searchIcons(primaryApiKey, backupApiKey, normalizedId, 1);
-  const exact = data.hits.find((hit) => importHitMatchesId(hit, normalizedId));
-
-  return {
-    ...(exact ? { ...data, hits: [exact], totalHits: 1, totalPages: 1 } : { ...data, hits: [] }),
-    usedBackup: data.usedBackup,
-  };
+  if (lastError instanceof Error) throw lastError;
+  throw new Error("The macOSicons share link could not be resolved.");
 }
 
 export function parseIconImportUrls(text: string): { urls: string[]; invalidCount: number } {
