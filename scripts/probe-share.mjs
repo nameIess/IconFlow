@@ -8,20 +8,23 @@ const response = await fetch(url, {
 });
 const body = await response.text();
 const normalized = body.replaceAll("\\/", "/");
-const icnsMatch = normalized.match(/"icnsUrl"\s*:\s*"([^"]+\.icns(?:[?#][^"]*)?)"/iu);
-if (!response.ok || !icnsMatch) {
+const urls = [...normalized.matchAll(/https?:\/\/[^\s"'<>\\]+/giu)]
+  .map((match) => match[0].replace(/\\u002F/gu, "/"))
+  .filter((value) => /^https:\/\/s3-new\.macosicons\.com\/.*\.icns(?:$|[?#])/iu.test(value));
+const icnsUrl = urls[0];
+
+if (!response.ok || !icnsUrl) {
   console.error(JSON.stringify({
     status: response.status,
     finalUrl: response.url,
     contentType: response.headers.get("content-type"),
     length: body.length,
     title: body.match(/<title[^>]*>([^<]+)<\/title>/iu)?.[1] || null,
-    hasIcnsUrl: Boolean(icnsMatch),
+    icnsCandidates: urls.slice(0, 5),
   }, null, 2));
   process.exit(1);
 }
 
-const icnsUrl = icnsMatch[1];
 const asset = await fetch(icnsUrl, {
   headers: { "User-Agent": "IconFlow/3 macOSicons importer" },
   redirect: "error",
