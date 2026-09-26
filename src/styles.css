@@ -341,6 +341,7 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   border-radius: 14px;
 }
 .selection-bar > span { margin-right: auto; font-weight: 700; }
+.selection-bar > button:first-child { flex: 0 0 auto; }
 .icon-card.selected { outline: 2px solid var(--accent, currentColor); }
 .select-icon {
   display: inline-flex;
@@ -354,4 +355,10 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   height: 16px;
   accent-color: currentColor;
   cursor: pointer;
+}
+
+@media (max-width: 620px) {
+  .selection-bar { flex-wrap: wrap; }
+  .selection-bar > span { width: 100%; margin-right: 0; }
+  .selection-bar > button { flex: 1 1 auto; justify-content: center; }
 }
