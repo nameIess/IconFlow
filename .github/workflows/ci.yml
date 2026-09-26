@@ -24,5 +24,8 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high --no-package-lock
 
+      - name: Test macOSicons share resolver
+        run: node scripts/test-share-resolver.mjs
+
       - name: Typecheck and build
         run: npm run build
