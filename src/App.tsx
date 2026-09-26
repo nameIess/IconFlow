@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
 import { clearSearchCache, fetchIcns, fetchImageAsset, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
-import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl } from "./converter";
+import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl, zipFiles } from "./converter";
 
 type Format = "png" | "ico";
 const PRIMARY_KEY = "iconflow.primaryApiKey";
@@ -65,6 +65,8 @@ function App() {
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
   const [importOpen, setImportOpen] = useState(false);
@@ -346,15 +348,79 @@ function App() {
     });
   }
 
+  function toggleSelectAll() {
+    const allSelected = results.length > 0 && results.every((hit, index) => selectedIds.has(hitId(hit, index)));
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+
+    setSelectedIds(new Set(results.map((hit, index) => hitId(hit, index))));
+  }
+
+  function uniqueZipFilename(name: string, used: Set<string>): string {
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+
+    const dot = name.lastIndexOf(".");
+    const base = dot > 0 ? name.slice(0, dot) : name;
+    const extension = dot > 0 ? name.slice(dot) : "";
+    let suffix = 2;
+    let candidate = `${base} (${suffix})${extension}`;
+    while (used.has(candidate)) {
+      suffix += 1;
+      candidate = `${base} (${suffix})${extension}`;
+    }
+    used.add(candidate);
+    return candidate;
+  }
+
   async function downloadSelected() {
     const selected = results.filter((hit, index) => selectedIds.has(hitId(hit, index)));
     if (!selected.length) return setToast("Select at least one icon first.");
 
-    for (const hit of selected) {
-      await downloadIcon(hit, formatById[hitId(hit)] || "ico");
+    setBulkDownloading(true);
+    setBulkProgress(0);
+    setMenuId(null);
+
+    try {
+      const files: { name: string; blob: Blob }[] = [];
+      const usedNames = new Set<string>();
+
+      for (let index = 0; index < selected.length; index += 1) {
+        const hit = selected[index];
+        const id = hitId(hit, results.indexOf(hit));
+        const format = formatById[id] || "ico";
+        const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+        if (!sourceUrl) throw new Error(`No downloadable asset was found for ${hit.appName}.`);
+
+        const blob = hit.icnsUrl
+          ? (format === "ico"
+            ? await icnsToIco(await fetchIcns(hit.icnsUrl))
+            : await icnsToPng(await fetchIcns(hit.icnsUrl)))
+          : (format === "ico"
+            ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
+            : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
+
+        files.push({
+          name: uniqueZipFilename(filename(hit.appName, format), usedNames),
+          blob,
+        });
+        setBulkProgress(index + 1);
+      }
+
+      const archive = await zipFiles(files);
+      download(archive, `iconflow-icons-${new Date().toISOString().slice(0, 10)}.zip`);
+      setSelectedIds(new Set());
+      setToast(`Downloaded ${selected.length} icon(s) as one ZIP file.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Bulk download failed.");
+    } finally {
+      setBulkDownloading(false);
+      setBulkProgress(0);
     }
-    setSelectedIds(new Set());
-    setToast(`Downloaded ${selected.length} selected icon(s).`);
   }
 
   return (
@@ -386,7 +452,19 @@ function App() {
         </section>
 
         <section className="results-section">
-          {selectedIds.size > 0 && <div className="selection-bar glass"><span>{selectedIds.size} selected</span><button className="primary-button" onClick={() => void downloadSelected()} disabled={Boolean(busyId)}><Download size={16} /> Download selected</button><button className="secondary-button" onClick={() => setSelectedIds(new Set())}>Clear</button></div>}
+          {results.length > 0 && <div className="selection-bar glass">
+            <button className="secondary-button" onClick={toggleSelectAll} disabled={bulkDownloading}>
+              {results.length > 0 && results.every((hit, index) => selectedIds.has(hitId(hit, index))) ? "Clear all" : `Select all loaded (${results.length})`}
+            </button>
+            {selectedIds.size > 0 && <>
+              <span>{bulkDownloading ? `Preparing ${bulkProgress}/${selectedIds.size}…` : `${selectedIds.size} selected`}</span>
+              <button className="primary-button" onClick={() => void downloadSelected()} disabled={bulkDownloading || Boolean(busyId)}>
+                {bulkDownloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
+              </button>
+              <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={bulkDownloading}>Clear</button>
+            </>}
+          </div>}
           <div className="results-header">
             <div><span className="section-kicker">{results.length ? "Search results" : "Explore"}</span><h2>{results.length ? activeQuery : "Your icon shelf"}</h2></div>
             {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} loaded</span>}
@@ -400,7 +478,7 @@ function App() {
                 {results.map((hit, index) => {
                   const id = hitId(hit, index);
                   const format = formatById[id] || "ico";
-                  const busy = busyId === id;
+                  const busy = busyId === id || bulkDownloading;
                   const imageUrl = isTrustedImageUrl(hit.lowResPngUrl) ? hit.lowResPngUrl : undefined;
 
                   return (
