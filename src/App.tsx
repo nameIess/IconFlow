@@ -67,6 +67,7 @@ function App() {
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
   const requestGeneration = useRef(0);
+  const previewGeneration = useRef(0);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -222,22 +223,22 @@ function App() {
     const previousUrl = preview?.url;
     if (previousUrl) URL.revokeObjectURL(previousUrl);
 
-    const generation = ++requestGeneration.current;
+    const generation = ++previewGeneration.current;
     setPreview({ hit, loading: true });
 
     try {
       const buffer = await fetchIcns(hit.icnsUrl);
-      if (generation !== requestGeneration.current) return;
+      if (generation !== previewGeneration.current) return;
 
       const url = await previewUrl(buffer);
-      if (generation !== requestGeneration.current) {
+      if (generation !== previewGeneration.current) {
         URL.revokeObjectURL(url);
         return;
       }
 
       setPreview({ hit, url, loading: false });
     } catch (error) {
-      if (generation !== requestGeneration.current) return;
+      if (generation !== previewGeneration.current) return;
       setPreview({ hit, loading: false });
       setToast(error instanceof Error ? error.message : "Unable to preview the icon.");
     }
@@ -366,7 +367,7 @@ function App() {
 
       {preview && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
         <section className="preview-modal glass" role="dialog" aria-modal="true" aria-labelledby="preview-title">
-          <div className="modal-heading"><div><span className="section-kicker">Original ICNS</span><h2 id="preview-title">{preview.hit.appName}</h2></div><button className="icon-button" onClick={() => setPreview(null)} aria-label="Close preview"><X size={18} /></button></div>
+          <div className="modal-heading"><div><span className="section-kicker">Original ICNS</span><h2 id="preview-title">{preview.hit.appName}</h2></div><button className="icon-button" onClick={() => { previewGeneration.current += 1; setPreview(null); }} aria-label="Close preview"><X size={18} /></button></div>
           <div className="large-preview">{preview.loading ? <LoaderCircle className="spin" size={28} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <IconMark className="preview-fallback-icon" />}</div>
           <div className="creator-line"><span>{preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>{safeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noopener noreferrer">Creator <ExternalLink size={12} /></a>}</div>
         </section>
