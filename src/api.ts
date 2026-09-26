@@ -413,15 +413,17 @@ async function requestAuthenticatedImport(
 
   for (const key of keys) {
     try {
-      const exact = await requestSearch(key, id, 1, exactFilter);
+      // First use the documented search endpoint exactly as macOSicons
+      // documents it: the share identifier is the search query. This avoids
+      // assuming that the public `?icon=` token is an objectID.
+      const broad = await requestSearch(key, id, 1);
+      let hit = broad.hits.find((item) => importHitMatchesId(item, id)) ?? null;
 
-      // The API docs do not expose objectID in each returned hit. The filter
-      // itself is the proof that this hit belongs to the imported share ID.
-      let hit = exact.hits[0] ?? null;
-
+      // Some records may not expose their identifier in the response shape.
+      // In that case, use the API's objectID filter as a second, exact lookup.
       if (!hit) {
-        const broad = await requestSearch(key, id, 1);
-        hit = broad.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+        const exact = await requestSearch(key, id, 1, exactFilter);
+        hit = exact.hits[0] ?? null;
       }
 
       if (hit) {
