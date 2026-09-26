@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolveMacosiconsShareUrl } from "./api/resolve-icon";
+import { resolveMacosiconsShareUrl } from "./api/resolve-icon.ts";
 
 export default defineConfig({
   plugins: [
