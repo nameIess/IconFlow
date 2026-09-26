@@ -343,6 +343,214 @@ export async function searchIcons(
   return request;
 }
 
+export type ImportedIconResult = {
+  hits: IconHit[];
+  failed: string[];
+  usedBackup: boolean;
+};
+
+const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
+
+function parseImportUrl(value: string): URL | null {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function shareIdFromUrl(value: string): string | null {
+  const url = parseImportUrl(value);
+  if (!url || !MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) return null;
+
+  const queryId = url.searchParams.get("icon")?.trim();
+  if (queryId) return queryId;
+
+  const hash = url.hash.replace(/^#/, "");
+  if (hash) {
+    try {
+      const hashUrl = new URL(hash.startsWith("/") ? hash : "/" + hash, url.origin);
+      const hashId = hashUrl.searchParams.get("icon")?.trim();
+      if (hashId) return hashId;
+    } catch {}
+  }
+
+  const segment = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "");
+  const match = segment.match(/-([A-Za-z0-9]{8,})$/);
+  return match?.[1] || null;
+}
+
+function importHitMatchesId(hit: IconHit, id: string): boolean {
+  const target = id.trim().toLowerCase();
+  if (!target) return false;
+  return [hit.objectID, hit.icnsUrl, hit.lowResPngUrl]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLowerCase().includes(target));
+}
+
+async function requestPublicImport(id: string): Promise<IconHit | null> {
+  await waitForSearchSlot();
+
+  const controller = new AbortController();
+  activeControllers.add(controller);
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch("https://macosicons.com/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: id,
+        searchOptions: {
+          filters: ["objectID = " + JSON.stringify(id)],
+          hitsPerPage: 1,
+          page: 1,
+        },
+      }),
+      signal: controller.signal,
+      cache: "no-store",
+    });
+
+    if (!response.ok) return null;
+
+    const body: unknown = await response.json().catch(() => null);
+    const hits: unknown[] = Array.isArray(body)
+      ? body
+      : body !== null && typeof body === "object" && Array.isArray((body as Record<string, unknown>).hits)
+        ? (body as Record<string, unknown>).hits
+        : [];
+
+    const candidate = hits.find((item): item is IconHit => {
+      if (!item || typeof item !== "object") return false;
+      return importHitMatchesId(item as IconHit, id);
+    });
+
+    return candidate ?? null;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+    activeControllers.delete(controller);
+  }
+}
+
+async function requestAuthenticatedImport(
+  primaryApiKey: string,
+  backupApiKey: string,
+  id: string,
+): Promise<{ hit: IconHit | null; usedBackup: boolean }> {
+  const keys = [primaryApiKey.trim(), backupApiKey.trim()]
+    .filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+
+  for (const key of keys) {
+    try {
+      const data = await requestSearch(key, id, 1);
+      const hit = data.hits.find((item) => importHitMatchesId(item, id)) ?? null;
+      if (hit) return { hit, usedBackup: key === backupApiKey.trim() && key !== primaryApiKey.trim() };
+    } catch (error) {
+      if (error instanceof RateLimitError) continue;
+      if (key === primaryApiKey.trim() && backupApiKey.trim()) continue;
+      throw error;
+    }
+  }
+
+  return { hit: null, usedBackup: false };
+}
+
+function directImportedHit(url: URL): IconHit {
+  const name = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "Imported icon")
+    .replace(/\.icns$/i, "")
+    .replace(/[-_]+/g, " ")
+    .trim();
+
+  return {
+    appName: name || "Imported icon",
+    icnsUrl: url.toString(),
+    objectID: url.toString(),
+  };
+}
+
+export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  let invalidCount = 0;
+
+  for (const line of text.split(/\r?\n/)) {
+    const value = line.trim();
+    if (!value) continue;
+
+    const candidates = value.match(/https:\/\/[^\s<>"']+/gi) || [value];
+    let added = false;
+
+    for (const raw of candidates) {
+      const cleaned = raw.replace(/[),.;]+$/, "");
+      const url = parseImportUrl(cleaned);
+      if (!url) continue;
+
+      const host = url.hostname.toLowerCase();
+      const supported = MACOSICONS_HOSTS.has(host) ||
+        (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname));
+
+      if (!supported) continue;
+
+      const normalized = url.toString();
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        urls.push(normalized);
+      }
+      added = true;
+    }
+
+    if (!added) invalidCount += 1;
+    if (urls.length >= 100) break;
+  }
+
+  return { urls: urls.slice(0, 100), invalidCount };
+}
+
+export async function importIconUrls(
+  primaryApiKey: string,
+  backupApiKey: string,
+  urls: string[],
+): Promise<ImportedIconResult> {
+  const hits: IconHit[] = [];
+  const failed: string[] = [];
+  let usedBackup = false;
+
+  for (const raw of urls.slice(0, 100)) {
+    const url = parseImportUrl(raw);
+    if (!url) {
+      failed.push(raw);
+      continue;
+    }
+
+    if (url.hostname.toLowerCase() === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
+      hits.push(directImportedHit(url));
+      continue;
+    }
+
+    const id = shareIdFromUrl(url.toString());
+    if (!id) {
+      failed.push(raw);
+      continue;
+    }
+
+    let hit = await requestPublicImport(id);
+
+    if (!hit) {
+      const fallback = await requestAuthenticatedImport(primaryApiKey, backupApiKey, id);
+      hit = fallback.hit;
+      usedBackup = usedBackup || fallback.usedBackup;
+    }
+
+    if (hit) hits.push(hit);
+    else failed.push(raw);
+  }
+
+  return { hits, failed, usedBackup };
+}
+
 export function clearSearchCache(): void {
   cacheGeneration += 1;
   searchCache.clear();
