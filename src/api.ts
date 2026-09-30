@@ -58,11 +58,7 @@ let lastSearchStartedAt = 0;
 async function readTextUpToLimit(response: Response, maxBytes: number): Promise<string> {
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > maxBytes) throw new Error("The response is too large to process safely.");
-  if (!response.body) {
-    const text = await response.text();
-    if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error("The response is too large to process safely.");
-    return text;
-  }
+  if (!response.body) throw new Error("The response body could not be streamed safely.");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -86,11 +82,7 @@ async function readArrayBufferUpToLimit(response: Response, maxBytes: number): P
   const contentLength = Number(response.headers.get("content-length") || 0);
   if (contentLength > maxBytes) throw new Error("The icon source is too large to process safely.");
 
-  if (!response.body) {
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > maxBytes) throw new Error("The icon source is too large to process safely.");
-    return buffer;
-  }
+  if (!response.body) throw new Error("The response body could not be streamed safely.");
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
