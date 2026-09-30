@@ -3,6 +3,8 @@ const ICNS_HEADER_SIZE = 8;
 const ICNS_ENTRY_HEADER_SIZE = 8;
 const MAX_ICNS_BYTES = 64 * 1024 * 1024;
 const MAX_RENDER_SIZE = 1024;
+const MAX_SOURCE_IMAGE_BYTES = 25 * 1024 * 1024;
+const MAX_SOURCE_IMAGE_DIMENSION = 4096;
 
 function isPng(bytes: Uint8Array, offset: number): boolean {
   return offset >= 0 && offset + PNG.length <= bytes.length &&
@@ -156,11 +158,17 @@ export async function icnsToPng(buffer: ArrayBuffer): Promise<Blob> {
 }
 
 export async function imageToIco(buffer: ArrayBuffer, mimeType = "image/png"): Promise<Blob> {
+  if (buffer.byteLength < 16) throw new Error("The source image is empty or invalid.");
+  if (buffer.byteLength > MAX_SOURCE_IMAGE_BYTES) throw new Error("The source image is too large to process safely.");
+
   const imageUrl = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
   try {
     const image = new Image();
     image.src = imageUrl;
     await image.decode();
+    if (!image.naturalWidth || !image.naturalHeight || image.naturalWidth > MAX_SOURCE_IMAGE_DIMENSION || image.naturalHeight > MAX_SOURCE_IMAGE_DIMENSION) {
+      throw new Error("The source image dimensions are unsupported or unsafe to render.");
+    }
 
     const sizes = [16, 24, 32, 48, 64, 128, 256];
     const images = await Promise.all(sizes.map(async (size) => {
@@ -314,6 +322,7 @@ function zipU32(view: DataView, offset: number, value: number): void {
  */
 export async function zipFiles(files: ZipFile[]): Promise<Blob> {
   if (!files.length) throw new Error("No files were selected.");
+  if (files.length > 0xffff) throw new Error("Too many files were selected for a ZIP archive.");
 
   const entries: {
     name: Uint8Array;
