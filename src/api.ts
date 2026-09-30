@@ -53,6 +53,40 @@ let cacheGeneration = 0;
 const searchStarts: number[] = [];
 let lastSearchStartedAt = 0;
 
+async function readArrayBufferUpToLimit(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) throw new Error("The icon source is too large to process safely.");
+
+  if (!response.body) {
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > maxBytes) throw new Error("The icon source is too large to process safely.");
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("The icon source is too large to process safely.");
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output.buffer;
+}
+
 function cacheKey(query: string, page: number): string {
   return JSON.stringify([query, page, SEARCH_PAGE_SIZE]);
 }
@@ -560,7 +594,7 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
       throw new Error(`Unable to fetch the original icon (HTTP ${response.status}).`);
     }
 
-    const buffer = await response.arrayBuffer();
+    const buffer = await readArrayBufferUpToLimit(response, 64 * 1024 * 1024);
     if (buffer.byteLength < 8) {
       throw new Error("The icon source returned an empty or invalid file.");
     }
@@ -593,9 +627,8 @@ export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffe
   if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
     const contentLength = Number(response.headers.get("content-length") || 0);
     if (contentLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
-    const buffer = await response.arrayBuffer();
+    const buffer = await readArrayBufferUpToLimit(response, 25 * 1024 * 1024);
     if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
-    if (buffer.byteLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
     return { buffer, mimeType };
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
