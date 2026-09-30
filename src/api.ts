@@ -645,8 +645,10 @@ export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffe
     }
   if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
 
-  const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
-  if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
+  const mimeType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() || "";
+  if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/webp") {
+    throw new Error("The icon source is not a supported raster image.");
+  }
     const contentLength = Number(response.headers.get("content-length") || 0);
     if (contentLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
     const buffer = await readArrayBufferUpToLimit(response, 25 * 1024 * 1024);
