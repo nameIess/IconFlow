@@ -148,8 +148,11 @@ function App() {
     try {
       const data = await importIconUrls(urls);
       if (data.hits.length) {
-        setResults((current) => mergeUniqueHits(current, data.hits));
-        setTotal((current) => current + data.hits.length);
+        setResults((current) => {
+          const merged = mergeUniqueHits(current, data.hits);
+          setTotal(merged.length);
+          return merged;
+        });
         setActiveQuery("Imported icons");
         setPage(1);
         setTotalPages(1);
@@ -320,11 +323,11 @@ function App() {
     }
   }
 
-  async function downloadIcon(hit: IconHit, format: Format) {
+  async function downloadIcon(hit: IconHit, format: Format, index: number) {
     const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
     if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
-    const id = hitId(hit);
+    const id = hitId(hit, index);
     setBusyId(id);
     setMenuId(null);
     try {
@@ -519,7 +522,7 @@ function App() {
                         </div>
                         <div className="card-footer">
                           <span className="credit">{safeCreditUrl(hit.creditUrl) ? <a href={hit.creditUrl} target="_blank" rel="noopener noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}</span>
-                          <button className="download-button" disabled={busy} onClick={() => void downloadIcon(hit, format)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{busy ? "Working" : format.toUpperCase()}</button>
+                          <button className="download-button" disabled={busy} onClick={() => void downloadIcon(hit, format, index)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{busy ? "Working" : format.toUpperCase()}</button>
                         </div>
                       </div>
                     </article>
