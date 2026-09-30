@@ -35,7 +35,7 @@ function envNumber(name: keyof ImportMetaEnv, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-export const SEARCH_PAGE_SIZE = Math.floor(envNumber("VITE_SEARCH_PAGE_SIZE", DEFAULT_PAGE_SIZE));
+export const SEARCH_PAGE_SIZE = Math.min(200, Math.max(1, Math.floor(envNumber("VITE_SEARCH_PAGE_SIZE", DEFAULT_PAGE_SIZE))));
 const MIN_SEARCH_INTERVAL_MS = envNumber("VITE_MIN_SEARCH_INTERVAL_MS", DEFAULT_MIN_SEARCH_INTERVAL_MS);
 const SEARCH_CACHE_TTL_MS = envNumber("VITE_SEARCH_CACHE_TTL_MS", DEFAULT_SEARCH_CACHE_TTL_MS);
 const RATE_LIMIT_COOLDOWN_MS = envNumber("VITE_RATE_LIMIT_COOLDOWN_MS", DEFAULT_RATE_LIMIT_COOLDOWN_MS);
@@ -531,7 +531,10 @@ function isTrustedAssetUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     const hostname = parsed.hostname.toLowerCase();
-    return parsed.protocol === "https:" && hostname === "s3-new.macosicons.com";
+    if (parsed.protocol !== "https:" || hostname !== "s3-new.macosicons.com" || parsed.username || parsed.password || parsed.port) {
+      return false;
+    }
+    return /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(parsed.pathname);
   } catch {
     return false;
   }
@@ -573,17 +576,35 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
 }
 
 export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
-  if (!isTrustedImageUrl(url)) throw new Error("Blocked untrusted icon source.");
+  if (!isTrustedImageUrl(url) || !/\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(new URL(url).pathname)) {
+    throw new Error("Blocked untrusted icon source.");
+  }
 
-  const response = await fetch(url, { cache: "no-store" });
-  if (!isTrustedImageUrl(response.url)) throw new Error("The icon source redirected to an untrusted host.");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+    if (!isTrustedImageUrl(response.url) || !/\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(new URL(response.url).pathname)) {
+      throw new Error("The icon source redirected to an untrusted host.");
+    }
   if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
 
   const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
   if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
-  return { buffer, mimeType };
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
+    if (buffer.byteLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
+    return { buffer, mimeType };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The icon preview timed out. Try again.");
+    }
+    throw error instanceof Error ? error : new Error("The icon image could not be downloaded.");
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export function isTrustedImageUrl(value?: string): value is string {
