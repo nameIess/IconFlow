@@ -9,7 +9,8 @@ export default defineConfig({
       name: "iconflow-macosicons-resolver",
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
-          if (!req.url?.startsWith("/api/resolve-icon")) {
+          const requestUrl = new URL(req.url || "/", "http://localhost");
+          if (requestUrl.pathname !== "/api/resolve-icon") {
             next();
             return;
           }
@@ -21,7 +22,6 @@ export default defineConfig({
             return;
           }
 
-          const requestUrl = new URL(req.url, "http://localhost");
           const raw = requestUrl.searchParams.get("url") || "";
           const result = await resolveMacosiconsShareUrl(raw);
 
