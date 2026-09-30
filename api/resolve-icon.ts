@@ -1,6 +1,7 @@
 const ALLOWED_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
 const ASSET_HOSTS = new Set(["s3-new.macosicons.com"]);
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_REDIRECTS = 3;
 
 function isAllowedShareUrl(value: string): boolean {
   try {
@@ -48,6 +49,62 @@ function cleanUrl(value: string, base: string): string | null {
   } catch {
     return null;
   }
+}
+
+async function readTextUpToLimit(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error("Response body is too large.");
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("Response body is too large.");
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+function isAllowedResolverTarget(value: string): boolean {
+  return isAllowedShareUrl(value) || isAssetUrl(value);
+}
+
+async function fetchTrustedShareUrl(raw: string): Promise<Response> {
+  let current = raw;
+
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
+    const response = await fetch(current, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml,image/*",
+        "User-Agent": "IconFlow/3 macOSicons importer",
+      },
+      redirect: "manual",
+    });
+
+    if (response.status < 300 || response.status >= 400) return response;
+
+    const location = response.headers.get("location");
+    if (!location) throw new Error("macOSicons returned an invalid redirect.");
+    const next = new URL(location, current).toString();
+    if (!isAllowedResolverTarget(next)) {
+      throw new Error("macOSicons redirected to an untrusted host.");
+    }
+    current = next;
+  }
+
+  throw new Error("Too many redirects while resolving the macOSicons share page.");
 }
 
 function findAssets(html: string, base: string): { icnsUrl: string | null; previewUrl: string | null } {
@@ -100,13 +157,7 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
   }
 
   try {
-    const response = await fetch(raw, {
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        "User-Agent": "IconFlow/3 macOSicons importer",
-      },
-      redirect: "follow",
-    });
+    const response = await fetchTrustedShareUrl(raw);
 
     const contentType = response.headers.get("content-type") || "";
     if (!response.ok) {
@@ -126,7 +177,6 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
       };
     }
 
-    // Never accept an HTML response after a redirect to an unrelated host.
     if (!isAllowedShareUrl(response.url || raw)) {
       return {
         status: 502,
@@ -142,7 +192,7 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
       };
     }
 
-    const html = (await response.text()).slice(0, MAX_HTML_BYTES);
+    const html = await readTextUpToLimit(response, MAX_HTML_BYTES);
     const assets = findAssets(html, response.url || raw);
     if (!assets.icnsUrl && !assets.previewUrl) {
       return {
