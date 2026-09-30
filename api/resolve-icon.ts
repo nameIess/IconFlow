@@ -84,35 +84,29 @@ function isAllowedResolverTarget(value: string): boolean {
 
 async function fetchTrustedShareUrl(raw: string): Promise<Response> {
   let current = raw;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
-  try {
-    for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
-      const response = await fetch(current, {
-        headers: {
-          Accept: "text/html,application/xhtml+xml,image/*",
-          "User-Agent": "IconFlow/3 macOSicons importer",
-        },
-        redirect: "manual",
-        signal: controller.signal,
-      });
+  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
+    const response = await fetch(current, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml,image/*",
+        "User-Agent": "IconFlow/3 macOSicons importer",
+      },
+      redirect: "manual",
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
 
-      if (response.status < 300 || response.status >= 400) return response;
+    if (response.status < 300 || response.status >= 400) return response;
 
-      const location = response.headers.get("location");
-      if (!location) throw new Error("macOSicons returned an invalid redirect.");
-      const next = new URL(location, current).toString();
-      if (!isAllowedResolverTarget(next)) {
-        throw new Error("macOSicons redirected to an untrusted host.");
-      }
-      current = next;
+    const location = response.headers.get("location");
+    if (!location) throw new Error("macOSicons returned an invalid redirect.");
+    const next = new URL(location, current).toString();
+    if (!isAllowedResolverTarget(next)) {
+      throw new Error("macOSicons redirected to an untrusted host.");
     }
-
-    throw new Error("Too many redirects while resolving the macOSicons share page.");
-  } finally {
-    clearTimeout(timer);
+    current = next;
   }
+
+  throw new Error("Too many redirects while resolving the macOSicons share page.");
 }
 
 function findAssets(html: string, base: string): { icnsUrl: string | null; previewUrl: string | null } {
