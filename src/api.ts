@@ -41,6 +41,8 @@ const SEARCH_CACHE_TTL_MS = envNumber("VITE_SEARCH_CACHE_TTL_MS", DEFAULT_SEARCH
 const RATE_LIMIT_COOLDOWN_MS = envNumber("VITE_RATE_LIMIT_COOLDOWN_MS", DEFAULT_RATE_LIMIT_COOLDOWN_MS);
 const PERSISTED_CACHE_KEY = "iconflow.searchCache.v3";
 const MAX_PERSISTED_CACHE_ENTRIES = 20;
+const MAX_SEARCH_RESPONSE_BYTES = 10 * 1024 * 1024;
+const MAX_IMPORT_TEXT_BYTES = 2 * 1024 * 1024;
 
 type CacheEntry = { expiresAt: number; data: SearchResponse };
 const searchCache = new Map<string, CacheEntry>();
@@ -52,6 +54,33 @@ const rateLimitedUntil = new Map<string, number>();
 let cacheGeneration = 0;
 const searchStarts: number[] = [];
 let lastSearchStartedAt = 0;
+
+async function readTextUpToLimit(response: Response, maxBytes: number): Promise<string> {
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) throw new Error("The response is too large to process safely.");
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error("The response is too large to process safely.");
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("The response is too large to process safely.");
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
 
 async function readArrayBufferUpToLimit(response: Response, maxBytes: number): Promise<ArrayBuffer> {
   const contentLength = Number(response.headers.get("content-length") || 0);
@@ -250,7 +279,8 @@ async function requestSearch(
       cache: "no-store",
     });
 
-    const body: unknown = await response.json().catch(() => null);
+    const rawBody = await readTextUpToLimit(response, MAX_SEARCH_RESPONSE_BYTES);
+    const body: unknown = (() => { try { return JSON.parse(rawBody); } catch { return null; } })();
     if (!response.ok) {
       if (response.status === 429) throw new RateLimitError();
       throw new Error(errorMessage(response.status, body));
