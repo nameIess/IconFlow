@@ -2,6 +2,7 @@ const ALLOWED_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
 const ASSET_HOSTS = new Set(["s3-new.macosicons.com"]);
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 function isAllowedShareUrl(value: string): boolean {
   try {
@@ -83,6 +84,8 @@ function isAllowedResolverTarget(value: string): boolean {
 
 async function fetchTrustedShareUrl(raw: string): Promise<Response> {
   let current = raw;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
     const response = await fetch(current, {
@@ -91,9 +94,13 @@ async function fetchTrustedShareUrl(raw: string): Promise<Response> {
         "User-Agent": "IconFlow/3 macOSicons importer",
       },
       redirect: "manual",
+      signal: controller.signal,
     });
 
-    if (response.status < 300 || response.status >= 400) return response;
+    if (response.status < 300 || response.status >= 400) {
+      clearTimeout(timer);
+      return response;
+    }
 
     const location = response.headers.get("location");
     if (!location) throw new Error("macOSicons returned an invalid redirect.");
@@ -104,6 +111,7 @@ async function fetchTrustedShareUrl(raw: string): Promise<Response> {
     current = next;
   }
 
+  clearTimeout(timer);
   throw new Error("Too many redirects while resolving the macOSicons share page.");
 }
 
@@ -217,7 +225,6 @@ export async function resolveMacosiconsShareUrl(raw: string): Promise<ResolveRes
       body: { error: "Unable to resolve the macOSicons share page." },
     };
   }
-}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "GET") {
