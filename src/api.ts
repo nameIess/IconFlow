@@ -188,7 +188,9 @@ function pruneSearchStarts(now: number): void {
 }
 
 async function waitForSearchSlot(): Promise<void> {
+  const generation = cacheGeneration;
   for (;;) {
+    if (generation !== cacheGeneration) throw new Error("Search request cancelled.");
     const now = Date.now();
     pruneSearchStarts(now);
 
@@ -207,6 +209,7 @@ async function waitForSearchSlot(): Promise<void> {
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, wait));
+    if (generation !== cacheGeneration) throw new Error("Search request cancelled.");
   }
 }
 
