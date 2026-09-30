@@ -28,11 +28,7 @@ function cleanUrl(value: string, base: string): string | null {
 }
 
 async function readTextUpToLimit(response: Response, maxBytes: number): Promise<string> {
-  if (!response.body) {
-    const text = await response.text();
-    if (new TextEncoder().encode(text).byteLength > maxBytes) throw new Error("Response body is too large.");
-    return text;
-  }
+  if (!response.body) throw new Error("The response body could not be streamed safely.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let total = 0;
