@@ -181,6 +181,9 @@ function App() {
 
   async function importFromFile(file: File) {
     try {
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error("The text file is too large to import safely (maximum 2 MB).");
+      }
       const text = await file.text();
       const parsed = parseIconImportText(text);
       if (!parsed.urls.length) {
