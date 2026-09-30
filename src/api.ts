@@ -416,7 +416,7 @@ const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
 function parseImportUrl(value: string): URL | null {
   try {
     const url = new URL(value.trim());
-    return url.protocol === "https:" ? url : null;
+    return url.protocol === "https:" && !url.username && !url.password && !url.port ? url : null;
   } catch {
     return null;
   }
