@@ -575,7 +575,7 @@ function isTrustedAssetUrl(value: string): boolean {
 }
 
 export async function fetchIcns(url: string): Promise<ArrayBuffer> {
-  if (!isTrustedAssetUrl(url)) {
+  if (!isTrustedAssetUrl(url) || !/\.icns(?:$|[?#])/i.test(new URL(url).pathname)) {
     throw new Error("Blocked untrusted icon source.");
   }
 
