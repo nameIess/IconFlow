@@ -16,13 +16,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install
-        run: npm install --ignore-scripts --no-fund
+        run: npm ci --ignore-scripts --no-fund
 
       - name: Audit dependencies
-        run: npm audit --audit-level=high --no-package-lock
+        run: npm audit --audit-level=high
 
       - name: Typecheck and build
         run: npm run build
