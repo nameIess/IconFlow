@@ -1,5 +1,6 @@
 export type IconHit = {
   appName: string;
+  sourceUrl?: string;
   lowResPngUrl?: string;
   icnsUrl?: string;
   iOSUrl?: string;
@@ -561,6 +562,7 @@ export async function importIconUrls(urls: string[]): Promise<ImportedIconResult
 
       hits.push({
         appName: name || "Imported icon",
+        sourceUrl: raw,
         icnsUrl: isIcns ? asset.toString() : undefined,
         lowResPngUrl: previewAssetUrl || (isImage ? asset.toString() : undefined),
         objectID: raw,
