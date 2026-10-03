@@ -315,7 +315,7 @@ async function requestSearch(
       : Math.max(1, Math.ceil(totalHits / SEARCH_PAGE_SIZE));
 
     return {
-      hits: result.hits as IconHit[],
+      hits: result.hits.map(normalizeSearchHit),
       query: typeof result.query === "string" ? result.query : query,
       totalHits,
       totalPages,
@@ -416,6 +416,34 @@ export type ImportedIconResult = {
 };
 
 const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
+
+function sourceUrlFromAssetUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "s3-new.macosicons.com") return undefined;
+
+    const filename = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) || "");
+    const match = filename.match(/(?:^|_)([A-Za-z0-9]{8,64})_lowResPng-[A-Za-z0-9]+\.(?:png|jpe?g|webp)$/i);
+    if (match?.[1]) return `https://macosicons.com/?icon=${match[1]}`;
+
+    const icnsMatch = filename.match(/(?:^|_)([A-Za-z0-9]{8,64})(?:-[A-Za-z0-9]+)?\.icns$/i);
+    if (icnsMatch?.[1]) return `https://macosicons.com/?icon=${icnsMatch[1]}`;
+  } catch {}
+
+  return undefined;
+}
+
+function normalizeSearchHit(raw: unknown): IconHit {
+  const hit = raw && typeof raw === "object" ? { ...(raw as Record<string, unknown>) } as IconHit : { appName: "Unknown icon" };
+  if (!hit.sourceUrl) {
+    hit.sourceUrl =
+      sourceUrlFromAssetUrl(hit.lowResPngUrl) ||
+      sourceUrlFromAssetUrl(hit.icnsUrl);
+  }
+  return hit;
+}
 
 function parseImportUrl(value: string): URL | null {
   try {
