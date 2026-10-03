@@ -166,8 +166,11 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .credit { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-2); font-size: 10px; }
 .credit a { color: var(--muted); text-decoration: none; }
 .credit a:hover { color: var(--text); }
+.download-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
 .download-button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 10px; color: #fff; background: rgba(89,136,255,.22); font-size: 10px; font-weight: 700; }
 .download-button:hover { background: rgba(89,136,255,.34); }
+.secondary-download-button { background: rgba(255,255,255,.08); }
+.secondary-download-button:hover { background: rgba(255,255,255,.14); }
 
 .empty-state { border-radius: 24px; min-height: 300px; display: grid; place-items: center; align-content: center; text-align: center; padding: 50px 20px; }
 .empty-icon { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px; color: var(--accent); background: rgba(111,153,255,.12); margin-bottom: 15px; overflow: hidden; }
