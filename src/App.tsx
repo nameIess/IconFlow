@@ -518,7 +518,7 @@ function App() {
               <button className="secondary-button" onClick={downloadSelectedUrls} disabled={bulkDownloading || Boolean(busyId)}>
                 <Link2 size={16} /> Download URLs as TXT
               </button>
-              <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={bulkDownloading}>Clear</button>
+
             </>}
           </div>}
           <div className="results-header">
