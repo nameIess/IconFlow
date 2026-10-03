@@ -347,6 +347,36 @@ function App() {
     }
   }
 
+  async function downloadPng(hit: IconHit, index: number) {
+    await downloadIcon(hit, "png", index);
+  }
+
+  function selectedHits(): IconHit[] {
+    return results.filter((hit, index) => selectedIds.has(hitId(hit, index)));
+  }
+
+  function imageUrlForExport(hit: IconHit): string | undefined {
+    return hit.lowResPngUrl || hit.icnsUrl;
+  }
+
+  function downloadSelectedUrls() {
+    const selected = selectedHits();
+    if (!selected.length) return setToast("Select at least one icon first.");
+
+    const urls = selected
+      .map(imageUrlForExport)
+      .filter((url): url is string => Boolean(url));
+
+    if (urls.length !== selected.length) {
+      return setToast("One or more selected icons has no image URL to export.");
+    }
+
+    const uniqueUrls = [...new Set(urls)];
+    const text = uniqueUrls.join("\n") + "\n";
+    download(new Blob([text], { type: "text/plain;charset=utf-8" }), `icon-urls-${new Date().toISOString().slice(0, 10)}.txt`);
+    setToast(`Exported ${uniqueUrls.length} selected icon URL(s) as TXT.`);
+  }
+
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -486,6 +516,9 @@ function App() {
                 {bulkDownloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
                 {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
               </button>
+              <button className="secondary-button" onClick={downloadSelectedUrls} disabled={bulkDownloading || Boolean(busyId)}>
+                <Link2 size={16} /> Download URLs as TXT
+              </button>
               <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={bulkDownloading}>Clear</button>
             </>}
           </div>}
@@ -522,7 +555,10 @@ function App() {
                         </div>
                         <div className="card-footer">
                           <span className="credit">{safeCreditUrl(hit.creditUrl) ? <a href={hit.creditUrl} target="_blank" rel="noopener noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}</span>
-                          <button className="download-button" disabled={busy} onClick={() => void downloadIcon(hit, format, index)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{busy ? "Working" : format.toUpperCase()}</button>
+                          <div className="download-actions">
+                            <button className="download-button" disabled={busy} onClick={() => void downloadPng(hit, index)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{busy ? "Working" : "PNG"}</button>
+                            <button className="download-button secondary-download-button" disabled={busy} onClick={() => void downloadIcon(hit, "ico", index)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}ICO</button>
+                          </div>
                         </div>
                       </div>
                     </article>
