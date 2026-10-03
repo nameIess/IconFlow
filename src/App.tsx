@@ -356,7 +356,7 @@ function App() {
   }
 
   function imageUrlForExport(hit: IconHit): string | undefined {
-    return hit.lowResPngUrl || hit.icnsUrl;
+    return hit.sourceUrl || hit.lowResPngUrl || hit.icnsUrl;
   }
 
   function downloadSelectedUrls() {
@@ -373,7 +373,7 @@ function App() {
 
     const text = urls.join("\n") + "\n";
     download(new Blob([text], { type: "text/plain;charset=utf-8" }), `icon-urls-${new Date().toISOString().slice(0, 10)}.txt`);
-    setToast(`Exported ${urls.length} selected icon URL(s) as TXT.`);
+    setToast(`Exported ${urls.length} selected icon source URL(s) as TXT.`);
   }
 
   function toggleSelected(id: string) {
@@ -516,7 +516,7 @@ function App() {
                 {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
               </button>
               <button className="secondary-button" onClick={downloadSelectedUrls} disabled={bulkDownloading || Boolean(busyId)}>
-                <Link2 size={16} /> Download URLs as TXT
+                <Link2 size={16} /> Download source URLs as TXT
               </button>
 
             </>}
