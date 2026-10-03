@@ -371,10 +371,9 @@ function App() {
       return setToast("One or more selected icons has no image URL to export.");
     }
 
-    const uniqueUrls = [...new Set(urls)];
-    const text = uniqueUrls.join("\n") + "\n";
+    const text = urls.join("\n") + "\n";
     download(new Blob([text], { type: "text/plain;charset=utf-8" }), `icon-urls-${new Date().toISOString().slice(0, 10)}.txt`);
-    setToast(`Exported ${uniqueUrls.length} selected icon URL(s) as TXT.`);
+    setToast(`Exported ${urls.length} selected icon URL(s) as TXT.`);
   }
 
   function toggleSelected(id: string) {
