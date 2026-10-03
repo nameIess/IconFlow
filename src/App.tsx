@@ -516,7 +516,7 @@ function App() {
                 {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
               </button>
               <button className="secondary-button" onClick={downloadSelectedUrls} disabled={bulkDownloading || Boolean(busyId)}>
-                <Link2 size={16} /> Download URLs as TXT
+                <Link2 size={16} /> Download source URLs as TXT
               </button>
 
             </>}
