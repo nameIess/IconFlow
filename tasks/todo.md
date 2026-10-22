@@ -11,7 +11,7 @@
 - [x] Add converter validation, filename sanitization, ZIP boundary, import URL allow-listing/deduplication/cap tests, and resolver URL/redirect/MIME/size safeguard tests. Execution is still pending.
 - [x] Update `.github/workflows/ci.yml` for PRs to `master`, pushes to `master` and `feature/**`, and manual dispatch.
 - [x] Retain least-privilege permissions, immutable action SHAs, lockfile install, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Run tests, typecheck, build, and dependency audit and capture successful results. Recent Actions runs still fail before runner assignment (`runner_id: 0`, no steps or logs). Vercel reports `npm run build` exited with code 1, but build logs are unavailable through the connected integration (404). The local runtime cannot resolve github.com, so no local install or test execution was possible.
+- [ ] Run tests, typecheck, build, and dependency audit and capture successful results. Recent Actions runs still fail before runner assignment (`runner_id: 0`, no steps or logs). Vercel reports `READY` for the latest commit, confirming `npm run build` passes. `npm test` and `npm audit` remain unverified because Actions never started steps and this runtime cannot resolve github.com for a local install.
 - [ ] Checkpoint: confirm successful branch and pull-request CI runs.
 
 ## Phase 3 — Resolver and docs
