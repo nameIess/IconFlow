@@ -495,3 +495,27 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
     transform: none;
   }
 }
+
+
+:where(
+  button,
+  a[href],
+  input:not([type="hidden"]),
+  [role="button"]
+):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .skeleton-card::after {
+    animation: none !important;
+  }
+
+  .icon-card,
+  .icon-art img,
+  .preview-hint {
+    transition: none !important;
+  }
+}
