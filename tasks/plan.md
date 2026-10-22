@@ -36,7 +36,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [ ] Task 6: Run regression tests and the dependency audit, capture results, and fix any failures. Vercel deployment for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688` is `READY`, confirming dependency installation and `npm run build` (TypeScript build plus Vite production build). GitHub Actions jobs still fail before receiving a runner (runner ID 0, no steps/logs), so `npm test` and `npm audit` remain unverified.
 
 ### Checkpoint: Quality gates
-- [ ] Successful CI runs for the feature branch and pull requests targeting `master` (latest feature-branch run failed before any steps were reported).
+- [ ] Successful CI runs for the feature branch and PR #2 targeting `master` (both fail before runner assignment; rerunning PR job attempt 2 still yielded zero steps).
 - [x] Typecheck and production build pass in the latest Vercel deployment (`35d5693349efe23b956e4fccb836d9fa1f3a7688`).
 - [ ] Regression tests pass with captured results; GitHub Actions did not start any steps, so test execution remains unverified.
 - [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed because GitHub Actions jobs never reached a runner.
@@ -46,9 +46,9 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Finish runtime/browser verification. Source-level review is complete. Vercel build is `READY` for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688`; however, the connected Vercel account denied preview access (403) and the local runtime cannot resolve `github.com`, so browser smoke tests and local npm commands remain blocked.
+- [ ] Finish runtime/browser verification. Source-level review is complete. Vercel preview builds are `READY` for commits `35d5693349efe23b956e4fccb836d9fa1f3a7688` and `396891ca5ef66e802847fd118f7418f54a6dad28`; however, the connected Vercel account denied preview access (403) and the local runtime cannot resolve `github.com`, so browser smoke tests and local npm commands remain blocked. A CI adjustment to use explicit Node 24 and trigger on `fix/**` was committed as `396891ca5ef66e802847fd118f7418f54a6dad28`; it did not resolve the runner startup failure.
 - [x] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits at source level; no runtime security test has been performed.
-- [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was denied (403) and no browser automation is available in this execution environment.
+- [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was denied (403) and the Vercel sandbox-creation API also denied permission (403), so browser-level checks could not be run here.
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
