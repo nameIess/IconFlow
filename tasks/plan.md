@@ -45,9 +45,9 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Review the final diff for unintended changes and finish runtime/browser verification. A local clone was attempted but the environment could not resolve `github.com`, preventing local commands. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
-- [ ] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits.
-- [ ] Run a browser-level smoke test for search, import, preview, and download; preview access was previously blocked by Vercel protection and no browser automation is available in this execution environment.
+- [ ] Finish runtime/browser verification. Source-level review of the touched workflow, resolver, converter, import parser, dialog focus code, styles, and test files was completed. A local clone was attempted but the environment could not resolve `github.com`, preventing local commands. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
+- [x] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits at source level; no runtime security test has been performed.
+- [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was explicitly denied (403) for this deployment, and no browser automation is available in this execution environment.
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
