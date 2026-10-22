@@ -1,47 +1,52 @@
 name: "💬 Question / support"
-description: Ask a question about using IconFlow or its API
+description: Ask for help using IconFlow or its API
 title: "[Question]: "
+labels: ["question", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Need a hand with **IconFlow**? Share what you're trying to do and what you've already tried. **Never include API keys, access tokens, or private user data.**
+        Tell us what you're trying to accomplish and where you're stuck. Include only the details needed to understand the issue.
+
+        **This is a public forum. Never include API keys, access tokens, private user data, or confidential logs.**
   - type: dropdown
     id: topic
     attributes:
       label: Topic
       options:
-        - Using the website or editor
-        - Searching for icons
+        - Website or editor
+        - Finding icons
         - Generating or editing icons
         - Exporting or converting assets
         - API integration
         - Authentication or usage limits
-        - Other
+        - Other / not sure
     validations:
       required: true
   - type: textarea
     id: question
     attributes:
-      label: What do you need help with?
-      description: Include the goal, relevant endpoint or feature, and any error message.
-      placeholder: "I'm trying to…"
+      label: What are you trying to do?
+      description: Describe your goal, the relevant feature or endpoint, and the problem you're facing.
+      placeholder: "I'm trying to… but…"
     validations:
       required: true
   - type: textarea
     id: tried
     attributes:
       label: What have you tried?
-      description: Include a minimal code sample or request/response if relevant. Redact secrets.
+      description: Share relevant steps, a minimal code sample, or a redacted request/response if useful.
+      placeholder: "I tried… and got…"
   - type: input
     id: docs
     attributes:
-      label: Relevant documentation or link
+      label: Relevant documentation or public link
+      description: Optional link to the documentation or example you're following.
       placeholder: "https://…"
   - type: checkboxes
     id: checks
     attributes:
-      label: Before submitting
+      label: Submission checklist
       options:
-        - label: I removed API keys, tokens, and other sensitive information.
+        - label: I removed credentials and private or personal information.
           required: true
