@@ -23,7 +23,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Phase 1: Confirmed UI accessibility issues
 - [x] Task 1: Correct light-theme secondary text contrast (4.89:1 on the light page background).
 - [x] Task 2: Add modal focus entry, focus containment, and focus restoration in source; browser behavior still requires verification.
-- [x] Task 3: Increase icon-only and settings controls to at least 44px.
+- [x] Task 3: Increase icon-only and settings controls to at least 44px, including the mobile settings-button override.
 
 ### Checkpoint: UI
 - [x] Calculate contrast ratio for the adjusted token against the light-theme page surface.
@@ -31,7 +31,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [ ] Verify short-screen dialog scrolling and reduced-motion behavior remain intact.
 
 ### Phase 2: Regression tests and CI
-- [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, and import URL allow-listing/deduplication/caps. Tests are authored but execution remains unverified.
+- [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, import URL allow-listing/deduplication/caps, and resolver rejection of unsafe URLs/redirects, MIME types, and oversized responses. Tests are authored but execution remains unverified.
 - [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
 - [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. GitHub Actions jobs currently fail before receiving a runner (runner ID 0, no steps/logs); this is an infrastructure blocker, not evidence that the checks pass.
 
