@@ -38,16 +38,16 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Checkpoint: Quality gates
 - [ ] Successful CI runs for the feature branch and pull requests targeting `master` (latest feature-branch run failed before any steps were reported).
 - [ ] Tests, typecheck, and build pass locally or in CI with captured results. Latest Actions run failed before steps were reported (steps are null; no logs are available), so these checks remain unverified.
-- [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed in the observed failed Actions runs.
+- [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed because GitHub Actions jobs never reached a runner.
 
 ### Phase 3: Resolver hardening and documentation
-- [ ] Task 7: Configure a reliable shared or platform-level resolver rate limit once the deployment-supported mechanism is confirmed; `DESIGN.md` documents the remaining gap and current safeguards.
+- [x] Task 7: Configure and verify the active Vercel Firewall rule for `/api/resolve-icon` (120 requests per IP per 60-second fixed window, deny mitigation).
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Finish runtime/browser verification. Source-level review of the touched workflow, resolver, converter, import parser, dialog focus code, styles, and test files was completed. A local clone was attempted but the environment could not resolve `github.com`, preventing local commands. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
+- [ ] Finish runtime/browser verification. Source-level review is complete. Vercel build is `READY` for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688`; however, the connected Vercel account denied preview access (403) and the local runtime cannot resolve `github.com`, so browser smoke tests and local npm commands remain blocked.
 - [x] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits at source level; no runtime security test has been performed.
-- [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was explicitly denied (403) for this deployment, and no browser automation is available in this execution environment.
+- [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was denied (403) and no browser automation is available in this execution environment.
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
