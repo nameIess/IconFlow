@@ -8,8 +8,6 @@ export interface SearchHit {
   usersName?: string;
   downloads?: number;
   icnsUrl?: string;
-  lowResPngUrl?: string;
-  iOSUrl?: string;
   objectID?: string;
   [key: string]: unknown;
 }
@@ -63,6 +61,60 @@ export async function searchIcons(params: {
     data.hits = data.hits.slice(0, limit);
   }
   return data;
+}
+
+export async function resolveIconById(params: {
+  iconId: string;
+  apiKey: string;
+}): Promise<SearchHit | null> {
+  const { iconId, apiKey } = params;
+  try {
+    const payload = await searchIcons({
+      query: iconId,
+      limit: 50,
+      page: 1,
+      apiKey,
+    });
+
+    const hits = payload.hits ?? [];
+    const exact = hits.find((hit) => hit.objectID === iconId);
+    if (exact) return exact;
+
+    const urlMatch = hits.find(
+      (hit) => typeof hit.icnsUrl === "string" && hit.icnsUrl.includes(iconId)
+    );
+    if (urlMatch) return urlMatch;
+
+    if (hits.length > 0) {
+      const first = hits[0];
+      if (first.icnsUrl) return first;
+    }
+  } catch {
+    // Fallback to HTML parsing below.
+  }
+
+  const pageUrl = `https://macosicons.com/?icon=${encodeURIComponent(iconId)}`;
+  const response = await fetch(pageUrl, {
+    headers: {
+      "User-Agent": "macicon-fetcher/2.0.0",
+    },
+  });
+  if (!response.ok) return null;
+
+  const html = await response.text();
+  const icnsUrlMatch = html.match(/https?:\/\/[^"'\s<>]+\.icns/gi);
+  const icnsUrl = icnsUrlMatch?.[0];
+  if (!icnsUrl) return null;
+
+  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+  const titleText = titleMatch?.[1]?.trim() ?? "";
+  const appName = titleText.split("|")[0]?.trim() || `icon-${iconId}`;
+
+  return {
+    objectID: iconId,
+    appName,
+    icnsUrl,
+  };
 }
 
 function sleep(ms: number): Promise<void> {
