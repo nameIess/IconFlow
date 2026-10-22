@@ -51,22 +51,20 @@ DELETE_ICNS_AFTER_CONVERT=true
 ## Project Structure
 
 ```
-├── backend/
-│   └── src/
-│       ├── server.js          # HTTP server entry point
-│       ├── config/             # .env loader & config
-│       ├── controllers/        # Request handlers
-│       ├── routes/             # API route definitions
-│       ├── services/           # Business logic
-│       │   ├── search.js       #   macosicons.com API
-│       │   ├── download.js     #   Download & convert
-│       │   └── install.js      #   OS icon install
-│       └── utils/              # HTTP helpers
-├── frontend/
-│   └── public/
-│       ├── index.html          # Single-page UI
-│       ├── style.css           # Geist-inspired design system
-│       └── app.js              # Frontend logic
+├── src/
+│   ├── server.js          # HTTP server entry point
+│   ├── config/             # .env loader & config
+│   ├── controllers/        # Request handlers
+│   ├── routes/             # API route definitions
+│   ├── services/           # Business logic
+│   │   ├── search.js       #   macosicons.com API
+│   │   ├── download.js     #   Download & convert
+│   │   └── install.js      #   OS icon install
+│   └── utils/              # HTTP helpers
+├── public/
+│   ├── index.html          # Single-page UI
+│   ├── style.css           # Geist-inspired design system
+│   └── app.js              # Frontend logic
 ├── .env                        # Configuration
 ├── package.json
 ├── start.bat                   # Windows launcher

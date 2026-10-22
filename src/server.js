@@ -7,7 +7,7 @@ const { routeRequest } = require("./routes/api");
 const { serveStatic } = require("./utils/http");
 
 const CONFIG = loadConfig();
-const PUBLIC_DIR = path.resolve(__dirname, "..", "..", "frontend", "public");
+const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
 const server = http.createServer(async (req, res) => {
   // Try API routes first
@@ -26,8 +26,9 @@ server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
     console.error();
     console.error(`  [ERROR] Port ${CONFIG.port} is already in use.`);
-    console.error(`  Another instance of IconFlow may already be running.`);
-    console.error(`  → Close the other instance, or change PORT in .env`);
+    console.error(`  Another instance of IconFlow may already be running at:`);
+    console.error(`  → http://${CONFIG.host}:${CONFIG.port}`);
+    console.error(`  Close the other instance, or change PORT in .env`);
     console.error();
     process.exit(1);
   }

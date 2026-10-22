@@ -7,8 +7,29 @@ try { sharpModule = require("sharp"); } catch { sharpModule = null; }
 try { icoModule = require("sharp-ico"); } catch { icoModule = null; }
 try { icnsModule = require("@fiahfy/icns"); } catch { icnsModule = null; }
 
+const PARSEFILES_BASE = "https://parsefiles.back4app.com/JPaQcFfEEQ1ePBxbf6wvzkPMEqKYHhPYv8boI1Rc";
+
 function sanitize(name) {
   return name.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Convert an S3 macosicons URL to a parsefiles.back4app.com fallback URL.
+ * S3 pattern:  s3.macosicons.com/macosicons/icons/{id}/icnsFile_{hash}_{id}.icns
+ * Parsefiles:  parsefiles.back4app.com/{appId}/{hash}_{id}.icns
+ */
+function buildFallbackUrl(originalUrl) {
+  try {
+    const url = new URL(originalUrl);
+    if (!url.hostname.includes("s3.macosicons.com")) return null;
+
+    const filename = url.pathname.split("/").pop();
+    // Strip known prefixes: icnsFile_, lowResPngFile_, iOSFile_
+    const stripped = filename.replace(/^(icnsFile_|lowResPngFile_|iOSFile_)/, "");
+    return `${PARSEFILES_BASE}/${stripped}`;
+  } catch {
+    return null;
+  }
 }
 
 async function convertIcnsToIco(icnsPath, icoPath) {
@@ -37,8 +58,23 @@ async function convertIcnsToIco(icnsPath, icoPath) {
 }
 
 async function downloadFile(url, outPath) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  let res = await fetch(url);
+
+  // If the original URL fails and it's an S3 URL, try the parsefiles fallback
+  if (!res.ok) {
+    const fallbackUrl = buildFallbackUrl(url);
+    if (fallbackUrl) {
+      console.log(`[download] S3 returned ${res.status}, trying parsefiles fallback...`);
+      res = await fetch(fallbackUrl);
+      if (!res.ok) {
+        throw new Error(`Download failed (${res.status}) — both S3 and parsefiles fallback failed`);
+      }
+      console.log(`[download] Parsefiles fallback succeeded.`);
+    } else {
+      throw new Error(`Download failed (${res.status})`);
+    }
+  }
+
   const ab = await res.arrayBuffer();
   if (ab.byteLength === 0) throw new Error("Empty file");
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -89,4 +125,4 @@ async function downloadBatch({ icons, format, config }) {
   return results;
 }
 
-module.exports = { downloadIcon, downloadBatch, convertIcnsToIco };
+module.exports = { downloadIcon, downloadBatch, convertIcnsToIco, buildFallbackUrl };

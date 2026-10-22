@@ -1,3 +1,5 @@
+const { buildFallbackUrl } = require("./download");
+
 const SEARCH_ENDPOINT = "https://api.macosicons.com/api/v1/search";
 const SITE_SEARCH_ENDPOINT = "https://macosicons.com/api/search";
 const FETCH_TIMEOUT_MS = 15000;
@@ -14,6 +16,21 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
+/**
+ * Fix broken S3 URLs in a hit object by replacing them with
+ * parsefiles.back4app.com fallback URLs.
+ */
+function fixHitUrls(hit) {
+  if (!hit) return hit;
+  for (const key of ["icnsUrl", "lowResPngUrl", "iOSUrl"]) {
+    if (hit[key] && hit[key].includes("s3.macosicons.com")) {
+      const fallback = buildFallbackUrl(hit[key]);
+      if (fallback) hit[key] = fallback;
+    }
+  }
+  return hit;
+}
+
 async function searchIcons(query, limit, page, apiKey) {
   const offset = (Math.max(1, page) - 1) * limit;
   const res = await fetchWithTimeout(SEARCH_ENDPOINT, {
@@ -21,7 +38,14 @@ async function searchIcons(query, limit, page, apiKey) {
     headers: { "Content-Type": "application/json", "x-api-key": apiKey },
     body: JSON.stringify({ query, limit, offset }),
   });
-  return res.json();
+  const data = await res.json();
+
+  // Fix any broken S3 URLs in the results
+  if (Array.isArray(data.hits)) {
+    data.hits = data.hits.map(fixHitUrls);
+  }
+
+  return data;
 }
 
 async function resolveIconById(iconId, apiKey) {
@@ -41,7 +65,7 @@ async function resolveIconById(iconId, apiKey) {
       }),
     });
     const data = await res.json();
-    if (data.hits?.[0]?.icnsUrl) return data.hits[0];
+    if (data.hits?.[0]?.icnsUrl) return fixHitUrls(data.hits[0]);
   } catch {
     // Fall through to API search
   }
@@ -51,7 +75,7 @@ async function resolveIconById(iconId, apiKey) {
     const payload = await searchIcons(iconId, 50, 1, apiKey);
     const hits = payload.hits || [];
     const exact = hits.find((h) => h.objectID === iconId);
-    if (exact) return exact;
+    if (exact) return exact; // Already fixed by searchIcons
     if (hits[0]?.icnsUrl) return hits[0];
   } catch {
     // Let it return null
