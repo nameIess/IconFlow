@@ -80,6 +80,8 @@ function App() {
   const importModalFileRef = useRef<HTMLInputElement>(null);
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
+  const dialogReturnFocusRef = useRef<HTMLElement | null>(null);
+  const activeDialogKind = preview ? "preview" : importOpen ? "import" : settingsOpen ? "settings" : null;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -93,23 +95,68 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
-    if (!settingsOpen && !importOpen && !preview) return;
+    if (!activeDialogKind) {
+      dialogReturnFocusRef.current?.focus();
+      dialogReturnFocusRef.current = null;
+      return;
+    }
+
+    if (!dialogReturnFocusRef.current) {
+      const activeElement = document.activeElement;
+      dialogReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    }
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    if (!dialog) return;
+    const focusable = dialog.querySelector<HTMLElement>(
+      'input:not([type="hidden"]):not(:disabled), button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+    );
+    (focusable || dialog).focus();
+  }, [activeDialogKind]);
+
+  useEffect(() => {
+    if (!activeDialogKind) return;
 
     function handleDialogKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      if (preview) {
-        previewGeneration.current += 1;
-        setPreview(null);
-      } else if (importOpen) {
-        if (!importLoading) setImportOpen(false);
-      } else if (settingsOpen) {
-        setSettingsOpen(false);
+      const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+      if (!dialog) return;
+
+      if (event.key === "Escape") {
+        if (preview) {
+          previewGeneration.current += 1;
+          setPreview(null);
+        } else if (importOpen) {
+          if (!importLoading) setImportOpen(false);
+        } else if (settingsOpen) {
+          setSettingsOpen(false);
+        }
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not(:disabled), button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => element.offsetWidth > 0 || element.offsetHeight > 0);
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
     window.addEventListener("keydown", handleDialogKeyDown);
     return () => window.removeEventListener("keydown", handleDialogKeyDown);
-  }, [settingsOpen, importOpen, importLoading, preview]);
+  }, [activeDialogKind, importLoading, importOpen, preview, settingsOpen]);
 
   useEffect(() => {
     return () => {
@@ -580,7 +627,7 @@ function App() {
       {toast && <div className="toast glass" role="status">{toast}</div>}
 
       {importOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !importLoading) setImportOpen(false); }}>
-        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="import-title">
+        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="import-title" tabIndex={-1}>
           <div className="modal-heading">
             <div><span className="section-kicker">Import icons</span><h2 id="import-title">URL or text file</h2></div>
             <button className="icon-button" disabled={importLoading} onClick={() => setImportOpen(false)} aria-label="Close import"><X size={18} /></button>
@@ -597,7 +644,7 @@ function App() {
       </div>}
 
       {settingsOpen && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setSettingsOpen(false); }}>
-        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <section className="settings-modal glass" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1}>
           <div className="modal-heading"><div><span className="section-kicker">Local configuration</span><h2 id="settings-title">API access</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)} aria-label="Close settings"><X size={18} /></button></div>
           <div className="key-card"><div className="key-icon"><KeyRound size={19} /></div><div><strong>Two-key security model</strong><p>The primary key handles search. If it is rate-limited, the backup key handles the search request. Icon files are fetched directly from their asset URL.</p></div></div>
           <label className="field-label" htmlFor="primary-key">Primary API key</label>
@@ -620,7 +667,7 @@ function App() {
       </div>}
 
       {preview && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { previewGeneration.current += 1; setPreview(null); } }}>
-        <section className="preview-modal glass" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <section className="preview-modal glass" role="dialog" aria-modal="true" aria-labelledby="preview-title" tabIndex={-1}>
           <div className="modal-heading"><div><span className="section-kicker">Original ICNS</span><h2 id="preview-title">{preview.hit.appName}</h2></div><button className="icon-button" onClick={() => { previewGeneration.current += 1; setPreview(null); }} aria-label="Close preview"><X size={18} /></button></div>
           <div className="large-preview">{preview.loading ? <LoaderCircle className="spin" size={28} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <IconMark className="preview-fallback-icon" />}</div>
           <div className="creator-line"><span>{preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>{safeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noopener noreferrer">Creator <ExternalLink size={12} /></a>}</div>
