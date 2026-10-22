@@ -28,18 +28,19 @@ The light-theme `--muted-2` value is `#60697a` on `#eef1f7`, giving approximatel
 
 ## Verification
 
-Run the following before merging:
+The Vercel project build command enforces all quality gates before a deployment can become READY:
 
 ```sh
-npm ci
 npm test
 npm run typecheck
 npm run build
 npm audit --audit-level=high
 ```
 
-The GitHub Actions workflow runs tests, typecheck, production build, and a high-severity dependency audit on pull requests targeting `master`, pushes to `master` and `feature/**`, and manual dispatches. Audit failures are surfaced and fail the job after the other build checks have run.
+The chain currently configured in `vercel.json` is `npm test && npm run typecheck && npm run build && npm audit --audit-level=high`. A deployment for commit `c8c72308d4f7ae257f6bdfcb90dd83d49eb3458b` completed READY with this complete command, and the follow-up cleanup deployment for commit `33874864cb776b6ac31b4a9d3e66f054743dcd0e` is also READY. The converter regression test was corrected after the Vercel gate isolated its mismatched expected error text.
+
+GitHub Actions is configured to run the same test/typecheck/build/audit checks on PRs to `master`, pushes to `master`, `feature/**`, and `fix/**`, and manual dispatches. However, recent GitHub Actions jobs consistently fail before runner assignment (`runner_id: 0`, no steps or logs), even on a new branch and retry. Vercel deployment validation works as an independent gate; GitHub Actions still needs its runner allocation restored before the pull request should be merged. Do not treat the CI runner issue as a passing check.
 
 ## Resolver abuse protection note
 
-`api/resolve-icon.ts` validates allowed share and asset hosts, validates redirect destinations, applies an upstream timeout, and caps HTML response size. Vercel Firewall now has an active custom rule, **Limit icon resolver requests**, matching `/api/resolve-icon` and applying a per-IP fixed-window limit of 120 requests per 60 seconds with deny mitigation. This is a platform-level control shared across function instances; it avoids relying on in-memory per-instance counters.
+`api/resolve-icon.ts` validates allowed share and asset hosts, validates redirect destinations, applies an upstream timeout, and caps HTML response size. Vercel Firewall has an active custom rule, **Limit icon resolver requests**, matching `/api/resolve-icon` and applying a per-IP fixed-window limit of 120 requests per 60 seconds with deny mitigation. This is a platform-level control shared across function instances; it avoids relying on in-memory per-instance counters.
