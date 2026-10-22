@@ -42,4 +42,4 @@ The GitHub Actions workflow runs tests, typecheck, production build, and a high-
 
 ## Resolver abuse protection note
 
-`api/resolve-icon.ts` validates allowed share and asset hosts, validates redirect destinations, applies an upstream timeout, and caps HTML response size. These controls do not by themselves provide request-rate limiting. A reliable shared rate limiter requires a deployment-supported shared store or platform-level rate-limit configuration; an in-memory per-instance counter must not be represented as a complete production control.
+`api/resolve-icon.ts` validates allowed share and asset hosts, validates redirect destinations, applies an upstream timeout, and caps HTML response size. Vercel Firewall now has an active custom rule, **Limit icon resolver requests**, matching `/api/resolve-icon` and applying a per-IP fixed-window limit of 120 requests per 60 seconds with deny mitigation. This is a platform-level control shared across function instances; it avoids relying on in-memory per-instance counters.
