@@ -19,6 +19,7 @@ on:
     branches:
       - master
       - 'feature/**'
+      - 'fix/**'
 
   workflow_dispatch:
 
@@ -50,7 +51,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version-file: .nvmrc
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
