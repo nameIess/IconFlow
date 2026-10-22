@@ -14,11 +14,11 @@ export function parseIconImportText(text: string): { urls: string[]; invalidCoun
   const urls: string[] = [];
   let invalidCount = 0;
 
-  for (const line of text.split(/\\r?\\n/)) {
+  for (const line of text.split(/\r?\n/)) {
     const value = line.trim();
     if (!value) continue;
 
-    const candidates = value.match(/https:\\/\\/[^\\s<>"']+/gi) || [value];
+    const candidates = value.match(/https:\/\/[^\s<>"']+/gi) || [value];
     let added = false;
 
     for (const raw of candidates) {
@@ -28,7 +28,7 @@ export function parseIconImportText(text: string): { urls: string[]; invalidCoun
 
       const host = url.hostname.toLowerCase();
       const supported = MACOSICONS_HOSTS.has(host) ||
-        (host === "s3-new.macosicons.com" && /\\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
+        (host === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
 
       if (!supported) continue;
 
