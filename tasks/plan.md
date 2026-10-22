@@ -59,5 +59,5 @@ Close the confirmed issues from the static UI/security/release audit without bro
 | Browser preview remains inaccessible | Medium | Use CI/build evidence and report browser validation as unverified instead of claiming success |
 
 ## Open Questions
-- Which shared store or platform-level rate limiting facility is available to the deployed resolver? Do not assume one exists.
+- [x] Which shared store or platform-level rate limiting facility is available to the deployed resolver? Vercel Firewall custom rules are available for this project and the resolver limit is active.
 - Can a browser automation environment and the macOSicons API credentials be used for end-to-end checks?
