@@ -18,5 +18,5 @@
 - [ ] Establish deployment/runtime support for a shared rate limiter before choosing an implementation. Vercel connection denied access to the project; no reliable shared-store/platform configuration has been confirmed. Do not mistake an in-memory limiter for production protection.
 - [x] Document current resolver safeguards and the remaining rate-limit gap.
 - [x] Document design tokens, modal behavior, and verification commands in `DESIGN.md`.
-- [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. The preview URL currently returns 403 through the connected Vercel account.
-- [ ] Final diff and release-readiness review.
+- [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. Preview access was previously blocked by Vercel protection; this environment also cannot clone the repository or run browser automation. The preview URL currently returns 403 through the connected Vercel account.
+- [ ] Final diff and release-readiness review; source review remains partial and runtime checks are blocked.
