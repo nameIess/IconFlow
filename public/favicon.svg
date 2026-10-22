@@ -1,9 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 420" width="100%" height="100%">
   
   <defs>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&amp;family=Plus+Jakarta+Sans:wght@700;800;900&amp;family=JetBrains+Mono:wght@700&amp;display=swap');
-    </style>
     <!-- Primary Flow Gradient -->
     <linearGradient id="primaryFlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#06B6D4" />

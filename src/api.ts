@@ -35,12 +35,13 @@ function envNumber(name: keyof ImportMetaEnv, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-export const SEARCH_PAGE_SIZE = Math.floor(envNumber("VITE_SEARCH_PAGE_SIZE", DEFAULT_PAGE_SIZE));
+export const SEARCH_PAGE_SIZE = Math.min(200, Math.max(1, Math.floor(envNumber("VITE_SEARCH_PAGE_SIZE", DEFAULT_PAGE_SIZE))));
 const MIN_SEARCH_INTERVAL_MS = envNumber("VITE_MIN_SEARCH_INTERVAL_MS", DEFAULT_MIN_SEARCH_INTERVAL_MS);
 const SEARCH_CACHE_TTL_MS = envNumber("VITE_SEARCH_CACHE_TTL_MS", DEFAULT_SEARCH_CACHE_TTL_MS);
 const RATE_LIMIT_COOLDOWN_MS = envNumber("VITE_RATE_LIMIT_COOLDOWN_MS", DEFAULT_RATE_LIMIT_COOLDOWN_MS);
 const PERSISTED_CACHE_KEY = "iconflow.searchCache.v3";
 const MAX_PERSISTED_CACHE_ENTRIES = 20;
+const MAX_SEARCH_RESPONSE_BYTES = 10 * 1024 * 1024;
 
 type CacheEntry = { expiresAt: number; data: SearchResponse };
 const searchCache = new Map<string, CacheEntry>();
@@ -52,6 +53,59 @@ const rateLimitedUntil = new Map<string, number>();
 let cacheGeneration = 0;
 const searchStarts: number[] = [];
 let lastSearchStartedAt = 0;
+
+async function readTextUpToLimit(response: Response, maxBytes: number): Promise<string> {
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) throw new Error("The response is too large to process safely.");
+  if (!response.body) throw new Error("The response body could not be streamed safely.");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("The response is too large to process safely.");
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+}
+
+async function readArrayBufferUpToLimit(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) throw new Error("The icon source is too large to process safely.");
+
+  if (!response.body) throw new Error("The response body could not be streamed safely.");
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error("The icon source is too large to process safely.");
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+
+  const output = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output.buffer;
+}
 
 function cacheKey(query: string, page: number): string {
   return JSON.stringify([query, page, SEARCH_PAGE_SIZE]);
@@ -91,7 +145,10 @@ function loadPersistentCache(): void {
         data.hitsPerPage < 1
       ) continue;
 
-      searchCache.set(entry.key, { expiresAt: entry.expiresAt, data });
+      searchCache.set(entry.key, {
+        expiresAt: entry.expiresAt,
+        data,
+      });
     }
   } catch {
     try { localStorage.removeItem(PERSISTED_CACHE_KEY); } catch {}
@@ -113,7 +170,7 @@ function persistSearchCache(): void {
   }
 }
 
-function getCached(key: string): SearchResponse | null {
+function getCached(key: string): SearchResult | null {
   loadPersistentCache();
 
   const entry = searchCache.get(key);
@@ -123,7 +180,7 @@ function getCached(key: string): SearchResponse | null {
     persistSearchCache();
     return null;
   }
-  return entry.data;
+  return { ...entry.data, usedBackup: false };
 }
 
 function pruneSearchStarts(now: number): void {
@@ -133,7 +190,9 @@ function pruneSearchStarts(now: number): void {
 }
 
 async function waitForSearchSlot(): Promise<void> {
+  const generation = cacheGeneration;
   for (;;) {
+    if (generation !== cacheGeneration) throw new Error("Search request cancelled.");
     const now = Date.now();
     pruneSearchStarts(now);
 
@@ -152,6 +211,7 @@ async function waitForSearchSlot(): Promise<void> {
     }
 
     await new Promise((resolve) => window.setTimeout(resolve, wait));
+    if (generation !== cacheGeneration) throw new Error("Search request cancelled.");
   }
 }
 
@@ -216,7 +276,8 @@ async function requestSearch(
       cache: "no-store",
     });
 
-    const body: unknown = await response.json().catch(() => null);
+    const rawBody = await readTextUpToLimit(response, MAX_SEARCH_RESPONSE_BYTES);
+    const body: unknown = (() => { try { return JSON.parse(rawBody); } catch { return null; } })();
     if (!response.ok) {
       if (response.status === 429) throw new RateLimitError();
       throw new Error(errorMessage(response.status, body));
@@ -306,7 +367,7 @@ export async function searchIcons(
   const keyForCache = cacheKey(normalizedQuery, normalizedPage);
   const inFlightKey = JSON.stringify([primaryKey, backupKey, normalizedQuery, normalizedPage]);
   const cached = getCached(keyForCache);
-  if (cached) return { ...cached, usedBackup: false };
+  if (cached) return cached;
 
   const pending = inFlight.get(inFlightKey);
   if (pending) return pending;
@@ -360,42 +421,10 @@ const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
 function parseImportUrl(value: string): URL | null {
   try {
     const url = new URL(value.trim());
-    return url.protocol === "https:" ? url : null;
+    return url.protocol === "https:" && !url.username && !url.password && !url.port ? url : null;
   } catch {
     return null;
   }
-}
-
-function shareIdFromUrl(value: string): string | null {
-  const url = parseImportUrl(value);
-  if (!url || !MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) return null;
-
-  const queryId = url.searchParams.get("icon")?.trim();
-  if (queryId) return queryId;
-
-  const hash = url.hash.replace(/^#/, "");
-  if (hash) {
-    try {
-      const hashUrl = new URL(hash.startsWith("/") ? hash : "/" + hash, url.origin);
-      const hashId = hashUrl.searchParams.get("icon")?.trim();
-      if (hashId) return hashId;
-    } catch {}
-  }
-
-  const lastSegment = url.pathname.split("/").filter(Boolean).at(-1) || "";
-  const match = lastSegment.match(/-([A-Za-z0-9]{8,})$/);
-  return match?.[1] || null;
-}
-
-function importHitMatchesId(hit: IconHit, id: string): boolean {
-  const target = id.trim().toLowerCase();
-  if (!target) return false;
-
-  const candidateValues = Object.values(hit)
-    .filter((value): value is string => typeof value === "string")
-    .map((value) => value.toLowerCase());
-
-  return candidateValues.some((value) => value.includes(target));
 }
 
 async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: string; previewUrl?: string }> {
@@ -440,7 +469,7 @@ export function parseIconImportText(text: string): { urls: string[]; invalidCoun
 
       const host = url.hostname.toLowerCase();
       const supported = MACOSICONS_HOSTS.has(host) ||
-        (host === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname));
+        (host === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
 
       if (!supported) continue;
 
@@ -531,14 +560,17 @@ function isTrustedAssetUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     const hostname = parsed.hostname.toLowerCase();
-    return parsed.protocol === "https:" && hostname === "s3-new.macosicons.com";
+    if (parsed.protocol !== "https:" || hostname !== "s3-new.macosicons.com" || parsed.username || parsed.password || parsed.port) {
+      return false;
+    }
+    return /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(parsed.pathname);
   } catch {
     return false;
   }
 }
 
 export async function fetchIcns(url: string): Promise<ArrayBuffer> {
-  if (!isTrustedAssetUrl(url)) {
+  if (!isTrustedAssetUrl(url) || !/\.icns(?:$|[?#])/i.test(new URL(url).pathname)) {
     throw new Error("Blocked untrusted icon source.");
   }
 
@@ -557,7 +589,7 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
       throw new Error(`Unable to fetch the original icon (HTTP ${response.status}).`);
     }
 
-    const buffer = await response.arrayBuffer();
+    const buffer = await readArrayBufferUpToLimit(response, 64 * 1024 * 1024);
     if (buffer.byteLength < 8) {
       throw new Error("The icon source returned an empty or invalid file.");
     }
@@ -573,17 +605,37 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
 }
 
 export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
-  if (!isTrustedImageUrl(url)) throw new Error("Blocked untrusted icon source.");
+  if (!isTrustedImageUrl(url) || !/\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(new URL(url).pathname)) {
+    throw new Error("Blocked untrusted icon source.");
+  }
 
-  const response = await fetch(url, { cache: "no-store" });
-  if (!isTrustedImageUrl(response.url)) throw new Error("The icon source redirected to an untrusted host.");
-  if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+    if (!isTrustedImageUrl(response.url) || !/\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(new URL(response.url).pathname)) {
+      throw new Error("The icon source redirected to an untrusted host.");
+    }
+    if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
 
-  const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
-  if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
-  return { buffer, mimeType };
+    const mimeType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() || "";
+    if (mimeType !== "image/png" && mimeType !== "image/jpeg" && mimeType !== "image/webp") {
+      throw new Error("The icon source is not a supported raster image.");
+    }
+
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > 25 * 1024 * 1024) throw new Error("The icon image is too large to process safely.");
+    const buffer = await readArrayBufferUpToLimit(response, 25 * 1024 * 1024);
+    if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
+    return { buffer, mimeType };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The icon preview timed out. Try again.");
+    }
+    throw error instanceof Error ? error : new Error("The icon image could not be downloaded.");
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export function isTrustedImageUrl(value?: string): value is string {

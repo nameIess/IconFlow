@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Download, ExternalLink, KeyRound, Link2, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, KeyRound, Link2, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
 import { clearSearchCache, fetchIcns, fetchImageAsset, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
-import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl, zipFiles } from "./converter";
+import { download, filename, icnsToIco, icnsToPng, imageToIco, imageToPng, previewUrl, zipFiles } from "./converter";
 
 type Format = "png" | "ico";
 const PRIMARY_KEY = "iconflow.primaryApiKey";
@@ -9,6 +9,7 @@ const BACKUP_KEY = "iconflow.backupApiKey";
 const LEGACY_SEARCH_KEY = "iconflow.searchApiKey";
 const LEGACY_DOWNLOAD_KEY = "iconflow.downloadApiKey";
 const THEME_KEY = "iconflow.theme";
+const DEFAULT_FORMAT_KEY = "iconflow.defaultDownloadFormat";
 
 function stored(key: string): string {
   try { return localStorage.getItem(key)?.trim() || ""; } catch { return ""; }
@@ -35,14 +36,17 @@ function hitId(hit: IconHit, index = 0): string {
 function mergeUniqueHits(current: IconHit[], next: IconHit[]): IconHit[] {
   const seen = new Set<string>();
   const merged: IconHit[] = [];
-
   for (const hit of [...current, ...next]) {
-    const id = hit.objectID || hit.icnsUrl || `${hit.appName}-${merged.length}`;
-    if (seen.has(id)) continue;
-    seen.add(id);
+    const keys = [
+      hit.objectID ? `id:${hit.objectID.toLowerCase()}` : "",
+      hit.icnsUrl ? `icns:${hit.icnsUrl.toLowerCase()}` : "",
+      hit.lowResPngUrl ? `preview:${hit.lowResPngUrl.toLowerCase()}` : "",
+    ].filter(Boolean);
+    if (keys.some((key) => seen.has(key))) continue;
+    if (!keys.length) keys.push(`name:${hit.appName.toLowerCase()}:${merged.length}`);
+    keys.forEach((key) => seen.add(key));
     merged.push(hit);
   }
-
   return merged;
 }
 
@@ -60,8 +64,8 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(() => !storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY));
-  const [formatById, setFormatById] = useState<Record<string, Format>>({});
-  const [menuId, setMenuId] = useState<string | null>(null);
+  const [defaultFormat, setDefaultFormat] = useState<Format>(() => stored(DEFAULT_FORMAT_KEY) === "png" ? "png" : "ico");
+  const [draftDefaultFormat, setDraftDefaultFormat] = useState<Format>(() => stored(DEFAULT_FORMAT_KEY) === "png" ? "png" : "ico");
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -89,20 +93,6 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
-    if (menuId === null) return;
-    const close = (event: PointerEvent) => {
-      if (!(event.target instanceof Element) || !event.target.closest(".format-menu")) setMenuId(null);
-    };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuId(null); };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [menuId]);
-
-  useEffect(() => {
     return () => {
       if (preview?.url) URL.revokeObjectURL(preview.url);
     };
@@ -114,7 +104,6 @@ function App() {
     setPage(data.page);
     setTotalPages(data.totalPages);
     setActiveQuery(searchValue);
-    setFormatById({});
     setSelectedIds(new Set());
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -126,7 +115,6 @@ function App() {
 
     const generation = ++requestGeneration.current;
     setLoading(true);
-    setMenuId(null);
 
     try {
       const data = await searchIcons(primaryApiKey, backupApiKey, value, 1);
@@ -148,18 +136,20 @@ function App() {
     try {
       const data = await importIconUrls(urls);
       if (data.hits.length) {
-        setResults((current) => mergeUniqueHits(current, data.hits));
-        setTotal((current) => current + data.hits.length);
-        setActiveQuery("Imported icons");
-        setPage(1);
-        setTotalPages(1);
-        setFormatById({});
+        setResults((current) => {
+          const merged = mergeUniqueHits(current, data.hits);
+          if (!activeQuery) setTotal(merged.length);
+          return merged;
+        });
+        if (!activeQuery) {
+          setActiveQuery("Imported icons");
+          setPage(1);
+          setTotalPages(1);
+        }
         setSelectedIds(new Set());
         setImportOpen(false);
-
         const failedText = data.failed.length ? ` ${data.failed.length} link(s) could not be resolved.` : "";
-        const backupText = data.usedBackup ? " Backup API key was used." : "";
-        setToast(`Imported ${data.hits.length} icon(s).${failedText}${backupText}`);
+        setToast(`Imported ${data.hits.length} icon(s).${failedText}`);
       } else {
         setToast(data.failed.length ? `Imported 0 icon(s); ${data.failed.length} link(s) could not be resolved.` : "No supported icon links were found.");
       }
@@ -181,6 +171,9 @@ function App() {
 
   async function importFromFile(file: File) {
     try {
+      if (file.size > 2 * 1024 * 1024) {
+        throw new Error("The text file is too large to import safely (maximum 2 MB).");
+      }
       const text = await file.text();
       const parsed = parseIconImportText(text);
       if (!parsed.urls.length) {
@@ -196,12 +189,11 @@ function App() {
   }
 
   async function loadMore() {
-    if (loading || pageLoading || !activeQuery || page >= totalPages) return;
+    if (loading || pageLoading || importLoading || !activeQuery || page >= totalPages) return;
 
     const generation = ++requestGeneration.current;
     const nextPage = page + 1;
     setPageLoading(true);
-    setMenuId(null);
 
     try {
       const data = await searchIcons(primaryApiKey, backupApiKey, activeQuery, nextPage);
@@ -243,18 +235,20 @@ function App() {
     try {
       if (primaryKey) localStorage.setItem(PRIMARY_KEY, primaryKey); else localStorage.removeItem(PRIMARY_KEY);
       if (backupKey) localStorage.setItem(BACKUP_KEY, backupKey); else localStorage.removeItem(BACKUP_KEY);
+      localStorage.setItem(DEFAULT_FORMAT_KEY, draftDefaultFormat);
       localStorage.removeItem(LEGACY_SEARCH_KEY);
       localStorage.removeItem(LEGACY_DOWNLOAD_KEY);
       setPrimaryApiKey(primaryKey);
       setBackupApiKey(backupKey);
+      setDefaultFormat(draftDefaultFormat);
       clearSearchCache();
       requestGeneration.current += 1;
       setLoading(false);
       setPageLoading(false);
       setSettingsOpen(false);
-      setToast("API keys saved locally in this browser.");
+      setToast("Settings saved locally in this browser.");
     } catch {
-      setToast("Unable to save API keys in this browser.");
+      setToast("Unable to save settings in this browser.");
     }
   }
 
@@ -317,21 +311,20 @@ function App() {
     }
   }
 
-  async function downloadIcon(hit: IconHit, format: Format) {
+  async function downloadIcon(hit: IconHit, format: Format, index: number) {
     const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
     if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
-    const id = hitId(hit);
+    const id = hitId(hit, index);
     setBusyId(id);
-    setMenuId(null);
     try {
       const blob = hit.icnsUrl
         ? (format === "ico"
           ? await icnsToIco(await fetchIcns(hit.icnsUrl))
           : await icnsToPng(await fetchIcns(hit.icnsUrl)))
         : (format === "ico"
-          ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
-          : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
+          ? await (async () => { const asset = await fetchImageAsset(hit.lowResPngUrl!); return imageToIco(asset.buffer, asset.mimeType); })()
+          : await (async () => { const asset = await fetchImageAsset(hit.lowResPngUrl!); return imageToPng(asset.buffer, asset.mimeType); })());
       download(blob, filename(hit.appName, format));
       setToast(`${hit.appName} downloaded as ${format.toUpperCase()}.`);
     } catch (error) {
@@ -339,6 +332,31 @@ function App() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  function selectedHits(): IconHit[] {
+    return results.filter((hit, index) => selectedIds.has(hitId(hit, index)));
+  }
+
+  function imageUrlForExport(hit: IconHit): string | undefined {
+    return hit.lowResPngUrl || hit.icnsUrl;
+  }
+
+  function downloadSelectedUrls() {
+    const selected = selectedHits();
+    if (!selected.length) return setToast("Select at least one icon first.");
+
+    const urls = selected
+      .map(imageUrlForExport)
+      .filter((url): url is string => Boolean(url));
+
+    if (urls.length !== selected.length) {
+      return setToast("One or more selected icons has no image URL to export.");
+    }
+
+    const text = urls.join("\n") + "\n";
+    download(new Blob([text], { type: "text/plain;charset=utf-8" }), `icon-urls-${new Date().toISOString().slice(0, 10)}.txt`);
+    setToast(`Exported ${urls.length} selected icon URL(s) as TXT.`);
   }
 
   function toggleSelected(id: string) {
@@ -360,21 +378,18 @@ function App() {
   }
 
   function uniqueZipFilename(name: string, used: Set<string>): string {
-    if (!used.has(name)) {
-      used.add(name);
-      return name;
-    }
-
+    const key = (value: string) => value.toLocaleLowerCase("en-US");
+    if (!used.has(key(name))) { used.add(key(name)); return name; }
     const dot = name.lastIndexOf(".");
     const base = dot > 0 ? name.slice(0, dot) : name;
     const extension = dot > 0 ? name.slice(dot) : "";
     let suffix = 2;
     let candidate = `${base} (${suffix})${extension}`;
-    while (used.has(candidate)) {
+    while (used.has(key(candidate))) {
       suffix += 1;
       candidate = `${base} (${suffix})${extension}`;
     }
-    used.add(candidate);
+    used.add(key(candidate));
     return candidate;
   }
 
@@ -384,38 +399,43 @@ function App() {
 
     setBulkDownloading(true);
     setBulkProgress(0);
-    setMenuId(null);
 
     try {
       const files: { name: string; blob: Blob }[] = [];
       const usedNames = new Set<string>();
+      const failedNames: string[] = [];
 
       for (let index = 0; index < selected.length; index += 1) {
         const hit = selected[index];
-        const id = hitId(hit, results.indexOf(hit));
-        const format = formatById[id] || "ico";
-        const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
-        if (!sourceUrl) throw new Error(`No downloadable asset was found for ${hit.appName}.`);
-
-        const blob = hit.icnsUrl
-          ? (format === "ico"
-            ? await icnsToIco(await fetchIcns(hit.icnsUrl))
-            : await icnsToPng(await fetchIcns(hit.icnsUrl)))
-          : (format === "ico"
-            ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
-            : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
-
-        files.push({
-          name: uniqueZipFilename(filename(hit.appName, format), usedNames),
-          blob,
-        });
+        const format = defaultFormat;
+        try {
+          const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+          if (!sourceUrl) throw new Error("No downloadable asset.");
+          const blob = hit.icnsUrl
+            ? (format === "ico"
+              ? await icnsToIco(await fetchIcns(hit.icnsUrl))
+              : await icnsToPng(await fetchIcns(hit.icnsUrl)))
+            : (format === "ico"
+              ? await (async () => { const asset = await fetchImageAsset(hit.lowResPngUrl!); return imageToIco(asset.buffer, asset.mimeType); })()
+              : await (async () => { const asset = await fetchImageAsset(hit.lowResPngUrl!); return imageToPng(asset.buffer, asset.mimeType); })());
+          files.push({ name: uniqueZipFilename(filename(hit.appName, format), usedNames), blob });
+        } catch {
+          failedNames.push(hit.appName);
+        }
         setBulkProgress(index + 1);
+      }
+
+      if (!files.length) {
+        setToast(`No icons could be downloaded. Failed: ${failedNames.join(", ")}`);
+        return;
       }
 
       const archive = await zipFiles(files);
       download(archive, `iconflow-icons-${new Date().toISOString().slice(0, 10)}.zip`);
-      setSelectedIds(new Set());
-      setToast(`Downloaded ${selected.length} icon(s) as one ZIP file.`);
+      if (!failedNames.length) setSelectedIds(new Set());
+      setToast(failedNames.length
+        ? `Downloaded ${files.length} icon(s). Failed: ${failedNames.join(", ")}. Failed selections were kept for retry.`
+        : `Downloaded ${files.length} icon(s) as one ZIP file.`);
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Bulk download failed.");
     } finally {
@@ -429,12 +449,12 @@ function App() {
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
 
       <header className="topbar glass">
-        <button className="brand" onClick={() => { requestGeneration.current += 1; setLoading(false); setPageLoading(false); setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
+        <button className="brand" disabled={importLoading} onClick={() => { requestGeneration.current += 1; setLoading(false); setPageLoading(false); setQuery(""); setActiveQuery(""); setResults([]); setTotal(0); setPage(1); setTotalPages(1); }}>
           <span className="brand-mark"><IconMark /></span><span>IconFlow</span>
         </button>
         <div className="top-actions">
           <button className="icon-button" aria-label="Toggle theme" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>{theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}</button>
-          <button className="settings-button" onClick={() => { setDraftPrimaryKey(primaryApiKey); setDraftBackupKey(backupApiKey); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
+          <button className="settings-button" onClick={() => { setDraftPrimaryKey(primaryApiKey); setDraftBackupKey(backupApiKey); setDraftDefaultFormat(defaultFormat); setSettingsOpen(true); }}><Settings size={16} /><span>Settings</span></button>
         </div>
       </header>
 
@@ -480,7 +500,9 @@ function App() {
                 {bulkDownloading ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
                 {bulkDownloading ? "Creating ZIP…" : "Download as ZIP"}
               </button>
-              <button className="secondary-button" onClick={() => setSelectedIds(new Set())} disabled={bulkDownloading}>Clear</button>
+              <button className="secondary-button" onClick={downloadSelectedUrls} disabled={bulkDownloading || Boolean(busyId)}>
+                <Link2 size={16} /> Download URLs as TXT
+              </button>
             </>}
           </div>}
           <div className="results-header">
@@ -495,8 +517,6 @@ function App() {
               <div className="icon-grid">
                 {results.map((hit, index) => {
                   const id = hitId(hit, index);
-                  const format = formatById[id] || "ico";
-                  const busy = busyId === id || bulkDownloading;
                   const imageUrl = isTrustedImageUrl(hit.lowResPngUrl) ? hit.lowResPngUrl : undefined;
 
                   return (
@@ -509,14 +529,9 @@ function App() {
                         <div className="card-title-row">
                           <label className="select-icon"><input type="checkbox" checked={selectedIds.has(id)} onChange={() => toggleSelected(id)} aria-label={`Select ${hit.appName}`} /><span /></label>
                           <div><h3 title={hit.appName}>{hit.appName}</h3><p>{hit.category || "macOS icon"}</p></div>
-                          <div className="format-menu">
-                            <button className="small-button" onClick={() => setMenuId(menuId === id ? null : id)}>{format.toUpperCase()} <ChevronDown size={13} /></button>
-                            {menuId === id && <div className="dropdown glass">{(["png", "ico"] as Format[]).map((option) => <button key={option} onClick={() => { setFormatById((current) => ({ ...current, [id]: option })); setMenuId(null); }}>{option.toUpperCase()}</button>)}</div>}
-                          </div>
                         </div>
                         <div className="card-footer">
                           <span className="credit">{safeCreditUrl(hit.creditUrl) ? <a href={hit.creditUrl} target="_blank" rel="noopener noreferrer">{hit.credit || hit.uploadedBy || "Creator"}</a> : (hit.credit || hit.uploadedBy || "macOSicons")}</span>
-                          <button className="download-button" disabled={busy} onClick={() => void downloadIcon(hit, format)}>{busy ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}{busy ? "Working" : format.toUpperCase()}</button>
                         </div>
                       </div>
                     </article>
@@ -525,7 +540,7 @@ function App() {
               </div>
 
               {totalPages > page && <div className="pagination glass">
-                <button className="primary-button" disabled={pageLoading || loading} onClick={() => void loadMore()}>
+                <button className="primary-button" disabled={pageLoading || loading || importLoading} onClick={() => void loadMore()}>
                   {pageLoading ? <LoaderCircle className="spin" size={16} /> : <ChevronDown size={16} />}
                   {pageLoading ? "Loading…" : `Load more icons (${Math.min(SEARCH_PAGE_SIZE, Math.max(0, total - results.length))})`}
                 </button>
@@ -570,8 +585,17 @@ function App() {
           <div className="key-input"><Search size={17} /><input id="primary-key" type="password" value={draftPrimaryKey} onChange={(event) => setDraftPrimaryKey(event.target.value)} autoComplete="off" placeholder="macOSicons primary key" /></div>
           <label className="field-label" htmlFor="backup-key">Backup API key</label>
           <div className="key-input"><Download size={17} /><input id="backup-key" type="password" value={draftBackupKey} onChange={(event) => setDraftBackupKey(event.target.value)} autoComplete="off" placeholder="macOSicons backup key" /></div>
-          <div className="privacy-note"><ShieldCheck size={16} /> Keys are stored locally in this browser and sent directly to macOSicons only when a search request is made.</div>
-          <div className="modal-actions">{(primaryApiKey || backupApiKey) && <button className="danger-button" onClick={removeKeys}><Trash2 size={15} /> Remove keys</button>}<button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={saveSettings}>Save keys</button></div>
+          <div className="download-preference">
+            <span className="field-label">Default download format</span>
+            <div className="format-options" role="group" aria-label="Default download format">
+              {(["ico", "png"] as Format[]).map((option) => <button key={option} type="button" className={draftDefaultFormat === option ? "format-option active" : "format-option"} aria-pressed={draftDefaultFormat === option} onClick={() => setDraftDefaultFormat(option)}>
+                <strong>{option.toUpperCase()}</strong><span>{option === "ico" ? "Windows icon" : "Portable image"}</span>
+              </button>)}
+            </div>
+            <p className="modal-footnote">Used for preview downloads and ZIP downloads. ICO is the default unless you change it.</p>
+          </div>
+          <div className="privacy-note"><ShieldCheck size={16} /> Keys and download preference are stored locally in this browser.</div>
+          <div className="modal-actions">{(primaryApiKey || backupApiKey) && <button className="danger-button" onClick={removeKeys}><Trash2 size={15} /> Remove keys</button>}<button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={saveSettings}>Save settings</button></div>
           <p className="modal-footnote">Never put API keys in source code, public issues, screenshots, or chat messages.</p>
         </section>
       </div>}
@@ -581,6 +605,14 @@ function App() {
           <div className="modal-heading"><div><span className="section-kicker">Original ICNS</span><h2 id="preview-title">{preview.hit.appName}</h2></div><button className="icon-button" onClick={() => { previewGeneration.current += 1; setPreview(null); }} aria-label="Close preview"><X size={18} /></button></div>
           <div className="large-preview">{preview.loading ? <LoaderCircle className="spin" size={28} /> : preview.url ? <img src={preview.url} alt={preview.hit.appName} /> : <IconMark className="preview-fallback-icon" />}</div>
           <div className="creator-line"><span>{preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>{safeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noopener noreferrer">Creator <ExternalLink size={12} /></a>}</div>
+          <div className="preview-actions">
+            {(["ico", "png"] as Format[]).map((format) => (
+              <button key={format} className={format === defaultFormat ? "primary-button preview-download" : "secondary-button preview-download"} disabled={preview.loading || busyId === hitId(preview.hit, Math.max(0, results.indexOf(preview.hit)))} onClick={() => void downloadIcon(preview.hit, format, Math.max(0, results.indexOf(preview.hit)))}>
+                {busyId === hitId(preview.hit, Math.max(0, results.indexOf(preview.hit))) ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                Download {format.toUpperCase()}{format === defaultFormat ? " · Default" : ""}
+              </button>
+            ))}
+          </div>
         </section>
       </div>}
     </div>

@@ -154,20 +154,18 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .icon-card:hover .preview-hint { opacity: 1; transform: none; }
 
 .card-body { padding: 13px; }
-.card-title-row { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
-.card-title-row h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.card-title-row { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.card-title-row > div:not(.format-menu) { flex: 1 1 auto; min-width: 0; }
+.card-title-row h3 { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .card-title-row p { margin: 4px 0 0; color: var(--muted-2); font-size: 11px; }
-.format-menu { position: relative; }
-.small-button { display: inline-flex; align-items: center; gap: 3px; padding: 5px 7px; font-size: 10px; }
-.dropdown { position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); min-width: 72px; padding: 5px; border-radius: 11px; }
-.dropdown button { width: 100%; text-align: left; border: 0; background: transparent; color: var(--text); border-radius: 7px; padding: 7px 8px; font-size: 11px; }
-.dropdown button:hover { background: rgba(255,255,255,.08); }
+.select-icon { flex: 0 0 auto; margin-right: 0; }
+.small-button { display: inline-flex; align-items: center; gap: 3px; padding: 5px 7px; font-size: 10px; white-space: nowrap; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-top: 14px; }
+.card-footer { min-width: 0; }
+.card-footer .credit { flex: 1 1 auto; }
 .credit { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-2); font-size: 10px; }
 .credit a { color: var(--muted); text-decoration: none; }
 .credit a:hover { color: var(--text); }
-.download-button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border: 0; border-radius: 10px; color: #fff; background: rgba(89,136,255,.22); font-size: 10px; font-weight: 700; }
-.download-button:hover { background: rgba(89,136,255,.34); }
 
 .empty-state { border-radius: 24px; min-height: 300px; display: grid; place-items: center; align-content: center; text-align: center; padding: 50px 20px; }
 .empty-icon { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 17px; color: var(--accent); background: rgba(111,153,255,.12); margin-bottom: 15px; overflow: hidden; }
@@ -178,21 +176,6 @@ main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); ma
 .suggestions button { border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--muted); border-radius: 999px; padding: 7px 12px; font-size: 11px; }
 .suggestions button:hover { color: var(--text); border-color: var(--border-strong); }
 
-.infinite-results-status {
-  min-height: 46px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--muted-2);
-  font-size: 11px;
-  padding: 14px 0 4px;
-}
-.load-more-sentinel {
-  width: 100%;
-  height: 1px;
-  pointer-events: none;
-}
 
 .skeleton-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
 .skeleton-card { height: 280px; border-radius: 20px; position: relative; overflow: hidden; }
@@ -230,6 +213,14 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 .large-preview { min-height: 330px; border-radius: 19px; display: grid; place-items: center; background: radial-gradient(circle at center, rgba(255,255,255,.08), rgba(255,255,255,.015) 60%); border: 1px solid var(--border); }
 .large-preview img { width: min(70%, 330px); height: min(70%, 330px); object-fit: contain; filter: drop-shadow(0 28px 35px rgba(0,0,0,.3)); }
 .preview-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 13px; }
+.preview-download { min-width: 180px; justify-content: center; }
+.download-preference { margin-top: 20px; }
+.format-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.format-option { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 13px; border: 1px solid var(--border); border-radius: 13px; background: rgba(255,255,255,.025); color: var(--text); text-align: left; }
+.format-option strong { font-size: 13px; }
+.format-option span { color: var(--muted); font-size: 11px; }
+.format-option.active { border-color: var(--accent); background: rgba(89,136,255,.12); box-shadow: 0 0 0 1px var(--accent); }
+.format-option:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .creator-line { display: flex; justify-content: space-between; gap: 10px; color: var(--muted-2); font-size: 10px; margin-top: 12px; }
 .creator-line a { color: var(--muted); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
 
@@ -361,4 +352,19 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
   .selection-bar { flex-wrap: wrap; }
   .selection-bar > span { width: 100%; margin-right: 0; }
   .selection-bar > button { flex: 1 1 auto; justify-content: center; }
+}
+
+/* Keyboard and motion accessibility: make focus visible without changing pointer UX. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .skeleton-card::after { animation: none; }
+  .icon-card,
+  .icon-art img,
+  .preview-hint { transition: none; }
+  .spin { animation: none; }
 }

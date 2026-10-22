@@ -1,0 +1,47 @@
+name: "💬 Question / support"
+description: Ask a question about using IconFlow or its API
+title: "[Question]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need a hand with **IconFlow**? Share what you're trying to do and what you've already tried. **Never include API keys, access tokens, or private user data.**
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Using the website or editor
+        - Searching for icons
+        - Generating or editing icons
+        - Exporting or converting assets
+        - API integration
+        - Authentication or usage limits
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What do you need help with?
+      description: Include the goal, relevant endpoint or feature, and any error message.
+      placeholder: "I'm trying to…"
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
+      description: Include a minimal code sample or request/response if relevant. Redact secrets.
+  - type: input
+    id: docs
+    attributes:
+      label: Relevant documentation or link
+      placeholder: "https://…"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed API keys, tokens, and other sensitive information.
+          required: true
