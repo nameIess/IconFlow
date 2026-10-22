@@ -398,53 +398,23 @@ function importHitMatchesId(hit: IconHit, id: string): boolean {
   return candidateValues.some((value) => value.includes(target));
 }
 
-async function requestAuthenticatedImport(
-  primaryApiKey: string,
-  backupApiKey: string,
-  id: string,
-): Promise<{ hit: IconHit | null; usedBackup: boolean }> {
-  const primaryKey = primaryApiKey.trim();
-  const backupKey = backupApiKey.trim();
-  const keys = [primaryKey, backupKey].filter((key, index, all) => Boolean(key) && all.indexOf(key) === index);
+async function resolveMacosiconsShareUrl(url: string): Promise<string> {
+  const endpoint = `/api/resolve-icon?url=${encodeURIComponent(url)}`;
+  const response = await fetch(endpoint, { cache: "no-store" });
+  const body: unknown = await response.json().catch(() => null);
 
-  if (!keys.length) throw new Error("Add your primary API key in Settings first.");
-
-  const exactFilter = [`objectID = ${JSON.stringify(id)}`];
-
-  for (const key of keys) {
-    try {
-      const exact = await requestSearch(key, id, 1, exactFilter);
-      let hit = exact.hits.find((item) => importHitMatchesId(item, id)) ?? null;
-
-      if (!hit) {
-        const broad = await requestSearch(key, id, 1);
-        hit = broad.hits.find((item) => importHitMatchesId(item, id)) ?? null;
-      }
-
-      if (hit) {
-        return { hit, usedBackup: key === backupKey && key !== primaryKey };
-      }
-    } catch (error) {
-      if (error instanceof RateLimitError) continue;
-      if (key === primaryKey && backupKey && backupKey !== primaryKey) continue;
-      throw error;
-    }
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body
+      ? (body as { error?: unknown }).error
+      : null;
+    throw new Error(typeof message === "string" ? message : "Unable to resolve the macOSicons share URL.");
   }
 
-  return { hit: null, usedBackup: false };
-}
+  if (!body || typeof body !== "object" || typeof (body as { assetUrl?: unknown }).assetUrl !== "string") {
+    throw new Error("The macOSicons resolver returned no downloadable icon.");
+  }
 
-function directImportedHit(url: URL): IconHit {
-  const name = decodeURIComponent(url.pathname.split("/").filter(Boolean).pop() || "Imported icon")
-    .replace(/\.icns$/i, "")
-    .replace(/[-_]+/g, " ")
-    .trim();
-
-  return {
-    appName: name || "Imported icon",
-    icnsUrl: url.toString(),
-    objectID: url.toString(),
-  };
+  return (body as { assetUrl: string }).assetUrl;
 }
 
 export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
@@ -485,14 +455,9 @@ export function parseIconImportText(text: string): { urls: string[]; invalidCoun
   return { urls: urls.slice(0, 100), invalidCount };
 }
 
-export async function importIconUrls(
-  primaryApiKey: string,
-  backupApiKey: string,
-  urls: string[],
-): Promise<ImportedIconResult> {
+export async function importIconUrls(urls: string[]): Promise<ImportedIconResult> {
   const hits: IconHit[] = [];
   const failed: string[] = [];
-  let usedBackup = false;
 
   for (const raw of urls.slice(0, 100)) {
     const url = parseImportUrl(raw);
@@ -501,27 +466,40 @@ export async function importIconUrls(
       continue;
     }
 
-    if (url.hostname.toLowerCase() === "s3-new.macosicons.com" && /\.icns(?:$|[?#])/i.test(url.pathname)) {
-      hits.push(directImportedHit(url));
-      continue;
-    }
+    try {
+      let assetUrl = url.toString();
+      if (MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) {
+        assetUrl = await resolveMacosiconsShareUrl(assetUrl);
+      } else if (!(url.hostname.toLowerCase() === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname))) {
+        failed.push(raw);
+        continue;
+      }
 
-    const id = shareIdFromUrl(url.toString());
-    if (!id) {
-      failed.push(raw);
-      continue;
-    }
+      const asset = new URL(assetUrl);
+      const isIcns = /\.icns(?:$|[?#])/i.test(asset.pathname);
+      const isImage = /\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(asset.pathname);
+      if (asset.protocol !== "https:" || asset.hostname.toLowerCase() !== "s3-new.macosicons.com" || (!isIcns && !isImage)) {
+        failed.push(raw);
+        continue;
+      }
 
-    const result = await requestAuthenticatedImport(primaryApiKey, backupApiKey, id);
-    if (result.hit) {
-      hits.push(result.hit);
-      usedBackup = usedBackup || result.usedBackup;
-    } else {
+      const name = decodeURIComponent(asset.pathname.split("/").filter(Boolean).pop() || "Imported icon")
+        .replace(/\.(?:icns|png|jpe?g|webp)$/i, "")
+        .replace(/[-_]+/g, " ")
+        .trim();
+
+      hits.push({
+        appName: name || "Imported icon",
+        icnsUrl: isIcns ? asset.toString() : undefined,
+        lowResPngUrl: isImage ? asset.toString() : undefined,
+        objectID: raw,
+      });
+    } catch {
       failed.push(raw);
     }
   }
 
-  return { hits, failed, usedBackup };
+  return { hits, failed, usedBackup: false };
 }
 
 export function clearSearchCache(): void {
@@ -580,6 +558,20 @@ export async function fetchIcns(url: string): Promise<ArrayBuffer> {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export async function fetchImageAsset(url: string): Promise<{ buffer: ArrayBuffer; mimeType: string }> {
+  if (!isTrustedImageUrl(url)) throw new Error("Blocked untrusted icon source.");
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!isTrustedImageUrl(response.url)) throw new Error("The icon source redirected to an untrusted host.");
+  if (!response.ok) throw new Error(`Unable to fetch the icon image (HTTP ${response.status}).`);
+
+  const mimeType = response.headers.get("content-type")?.split(";")[0].trim() || "image/png";
+  if (!mimeType.startsWith("image/")) throw new Error("The icon source is not an image.");
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength < 16) throw new Error("The icon source returned an empty image.");
+  return { buffer, mimeType };
 }
 
 export function isTrustedImageUrl(value?: string): value is string {

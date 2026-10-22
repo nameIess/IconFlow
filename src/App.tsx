@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, ExternalLink, KeyRound, LoaderCircle, Moon, Search, Settings, ShieldCheck, Sun, Trash2, X } from "lucide-react";
-import { clearSearchCache, fetchIcns, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
-import { download, filename, icnsToIco, icnsToPng, previewUrl } from "./converter";
+import { clearSearchCache, fetchIcns, fetchImageAsset, importIconUrls, isTrustedImageUrl, parseIconImportText, searchIcons, SEARCH_PAGE_SIZE, type IconHit } from "./api";
+import { download, filename, icnsToIco, icnsToPng, imageToIco, previewUrl } from "./converter";
 
 type Format = "png" | "ico";
 const PRIMARY_KEY = "iconflow.primaryApiKey";
@@ -64,6 +64,7 @@ function App() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ hit: IconHit; url?: string; loading: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(() => stored(THEME_KEY) === "light" ? "light" : "dark");
   const [importOpen, setImportOpen] = useState(false);
@@ -111,6 +112,7 @@ function App() {
     setTotalPages(data.totalPages);
     setActiveQuery(searchValue);
     setFormatById({});
+    setSelectedIds(new Set());
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -141,7 +143,7 @@ function App() {
   async function importUrls(urls: string[]) {
     setImportLoading(true);
     try {
-      const data = await importIconUrls(primaryApiKey, backupApiKey, urls);
+      const data = await importIconUrls(urls);
       if (data.hits.length) {
         setResults((current) => mergeUniqueHits(current, data.hits));
         setTotal((current) => current + data.hits.length);
@@ -149,6 +151,7 @@ function App() {
         setPage(1);
         setTotalPages(1);
         setFormatById({});
+        setSelectedIds(new Set());
         setImportOpen(false);
 
         const failedText = data.failed.length ? ` ${data.failed.length} link(s) could not be resolved.` : "";
@@ -277,7 +280,8 @@ function App() {
   }
 
   async function openPreview(hit: IconHit) {
-    if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
+    const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+    if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
     const previousUrl = preview?.url;
     if (previousUrl) URL.revokeObjectURL(previousUrl);
@@ -286,10 +290,15 @@ function App() {
     setPreview({ hit, loading: true });
 
     try {
-      const buffer = await fetchIcns(hit.icnsUrl);
-      if (generation !== previewGeneration.current) return;
+      let url: string;
+      if (hit.icnsUrl) {
+        const buffer = await fetchIcns(hit.icnsUrl);
+        url = await previewUrl(buffer);
+      } else {
+        const asset = await fetchImageAsset(hit.lowResPngUrl!);
+        url = URL.createObjectURL(new Blob([asset.buffer], { type: asset.mimeType }));
+      }
 
-      const url = await previewUrl(buffer);
       if (generation !== previewGeneration.current) {
         URL.revokeObjectURL(url);
         return;
@@ -304,14 +313,20 @@ function App() {
   }
 
   async function downloadIcon(hit: IconHit, format: Format) {
-    if (!hit.icnsUrl) return setToast("This result has no original ICNS asset.");
+    const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
+    if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
-    const id = hit.objectID || hit.icnsUrl || hit.appName;
+    const id = hitId(hit);
     setBusyId(id);
     setMenuId(null);
     try {
-      const buffer = await fetchIcns(hit.icnsUrl);
-      const blob = format === "ico" ? await icnsToIco(buffer) : await icnsToPng(buffer);
+      const blob = hit.icnsUrl
+        ? (format === "ico"
+          ? await icnsToIco(await fetchIcns(hit.icnsUrl))
+          : await icnsToPng(await fetchIcns(hit.icnsUrl)))
+        : (format === "ico"
+          ? await imageToIco((await fetchImageAsset(hit.lowResPngUrl!)).buffer)
+          : new Blob([(await fetchImageAsset(hit.lowResPngUrl!)).buffer], { type: "image/png" }));
       download(blob, filename(hit.appName, format));
       setToast(`${hit.appName} downloaded as ${format.toUpperCase()}.`);
     } catch (error) {
@@ -319,6 +334,25 @@ function App() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function downloadSelected() {
+    const selected = results.filter((hit, index) => selectedIds.has(hitId(hit, index)));
+    if (!selected.length) return setToast("Select at least one icon first.");
+
+    for (const hit of selected) {
+      await downloadIcon(hit, formatById[hitId(hit)] || "ico");
+    }
+    setSelectedIds(new Set());
+    setToast(`Downloaded ${selected.length} selected icon(s).`);
   }
 
   return (
@@ -350,6 +384,7 @@ function App() {
         </section>
 
         <section className="results-section">
+          {selectedIds.size > 0 && <div className="selection-bar glass"><span>{selectedIds.size} selected</span><button className="primary-button" onClick={() => void downloadSelected()} disabled={Boolean(busyId)}><Download size={16} /> Download selected</button><button className="secondary-button" onClick={() => setSelectedIds(new Set())}>Clear</button></div>}
           <div className="results-header">
             <div><span className="section-kicker">{results.length ? "Search results" : "Explore"}</span><h2>{results.length ? activeQuery : "Your icon shelf"}</h2></div>
             {results.length > 0 && <span className="result-count">{results.length.toLocaleString()} of {total.toLocaleString()} loaded</span>}
@@ -367,13 +402,14 @@ function App() {
                   const imageUrl = isTrustedImageUrl(hit.lowResPngUrl) ? hit.lowResPngUrl : undefined;
 
                   return (
-                    <article className="icon-card glass" key={id}>
+                    <article className={`icon-card glass${selectedIds.has(id) ? " selected" : ""}`} key={id}>
                       <button className="preview-button" onClick={() => void openPreview(hit)} aria-label={`Preview ${hit.appName}`}>
                         <div className="icon-art">{imageUrl ? <img src={imageUrl} alt="" loading="lazy" decoding="async" /> : <IconMark className="fallback-icon" />}</div>
                         <span className="preview-hint">Preview ICNS</span>
                       </button>
                       <div className="card-body">
                         <div className="card-title-row">
+                          <label className="select-icon"><input type="checkbox" checked={selectedIds.has(id)} onChange={() => toggleSelected(id)} aria-label={`Select ${hit.appName}`} /><span /></label>
                           <div><h3 title={hit.appName}>{hit.appName}</h3><p>{hit.category || "macOS icon"}</p></div>
                           <div className="format-menu">
                             <button className="small-button" onClick={() => setMenuId(menuId === id ? null : id)}>{format.toUpperCase()} <ChevronDown size={13} /></button>
@@ -417,7 +453,7 @@ function App() {
             <div><span className="section-kicker">Import icons</span><h2 id="import-title">URL or text file</h2></div>
             <button className="icon-button" disabled={importLoading} onClick={() => setImportOpen(false)} aria-label="Close import"><X size={18} /></button>
           </div>
-          <p>Paste one macOSicons share URL or upload a .txt file containing icon URLs. Up to 100 links are imported and duplicates are ignored.</p>
+          <p>Paste one macOSicons share URL or upload a .txt file. IconFlow reads the shared page, previews the actual icon, and lets you choose exactly which icons to download. No search API request is used for imports.</p>
           <label className="field-label" htmlFor="import-url">Icon URL</label>
           <div className="key-input"><ExternalLink size={17} /><input id="import-url" value={importUrl} onChange={(event) => setImportUrl(event.target.value)} placeholder="https://macosicons.com/?icon=Ic1LCu7E7f" disabled={importLoading} /></div>
           <div className="modal-actions">
