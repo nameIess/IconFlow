@@ -1,4 +1,5 @@
 const SEARCH_ENDPOINT = "https://api.macosicons.com/api/v1/search";
+const SITE_SEARCH_ENDPOINT = "https://macosicons.com/api/search";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const FETCH_TIMEOUT_MS = 15000;
@@ -20,6 +21,42 @@ export interface SearchPayload {
   offset?: number;
   page?: number;
   totalPages?: number;
+}
+
+async function searchIconsByObjectId(iconId: string): Promise<SearchHit | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(SITE_SEARCH_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: "",
+        searchOptions: {
+          filters: [`objectID = ${iconId}`],
+          hitsPerPage: 1,
+          page: 1,
+          sort: ["timeStamp:desc"],
+        },
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Icon lookup failed (${response.status}): ${await response.text()}`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`Unexpected icon lookup response type: ${contentType}`);
+  }
+
+  const data = (await response.json()) as SearchPayload;
+  return data.hits?.[0] ?? null;
 }
 
 export async function searchIcons(params: {
@@ -69,6 +106,13 @@ export async function resolveIconById(params: {
 }): Promise<SearchHit | null> {
   const { iconId, apiKey } = params;
   try {
+    const siteHit = await searchIconsByObjectId(iconId);
+    if (siteHit?.icnsUrl) return siteHit;
+  } catch {
+    // Fall back to public API search below.
+  }
+
+  try {
     const payload = await searchIcons({
       query: iconId,
       limit: 50,
@@ -90,31 +134,10 @@ export async function resolveIconById(params: {
       if (first.icnsUrl) return first;
     }
   } catch {
-    // Fallback to HTML parsing below.
+    // Let the function return null below.
   }
 
-  const pageUrl = `https://macosicons.com/?icon=${encodeURIComponent(iconId)}`;
-  const response = await fetch(pageUrl, {
-    headers: {
-      "User-Agent": "macicon-fetcher/2.0.0",
-    },
-  });
-  if (!response.ok) return null;
-
-  const html = await response.text();
-  const icnsUrlMatch = html.match(/https?:\/\/[^"'\s<>]+\.icns/gi);
-  const icnsUrl = icnsUrlMatch?.[0];
-  if (!icnsUrl) return null;
-
-  const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
-  const titleText = titleMatch?.[1]?.trim() ?? "";
-  const appName = titleText.split("|")[0]?.trim() || `icon-${iconId}`;
-
-  return {
-    objectID: iconId,
-    appName,
-    icnsUrl,
-  };
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {
