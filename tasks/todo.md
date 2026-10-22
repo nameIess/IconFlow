@@ -15,7 +15,7 @@
 - [ ] Checkpoint: confirm successful branch and pull-request CI runs.
 
 ## Phase 3 — Resolver and docs
-- [ ] Establish deployment/runtime support for a shared rate limiter before choosing an implementation. Vercel connection denied access to the project; no reliable shared-store/platform configuration has been confirmed. Do not mistake an in-memory limiter for production protection.
+- [x] Configure and verify the active Vercel Firewall rule: `/api/resolve-icon`, 120 requests per IP per 60-second window, deny mitigation.
 - [x] Document current resolver safeguards and the remaining rate-limit gap.
 - [x] Document design tokens, modal behavior, and verification commands in `DESIGN.md`.
 - [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. Vercel explicitly denied deployment access (403); this environment also cannot clone the repository or run browser automation. The preview URL currently returns 403 through the connected Vercel account.
