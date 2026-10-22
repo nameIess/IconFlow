@@ -281,3 +281,128 @@ export function filename(name: string, extension: string): string {
   const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base) ? `_${base}` : base;
   return `${reserved}.${safeExtension}`;
 }
+
+type ZipFile = { name: string; blob: Blob };
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function utf8(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function zipU16(view: DataView, offset: number, value: number): void {
+  view.setUint16(offset, value, true);
+}
+
+function zipU32(view: DataView, offset: number, value: number): void {
+  view.setUint32(offset, value >>> 0, true);
+}
+
+/**
+ * Build a ZIP archive in the browser without triggering one download per icon.
+ * Files use ZIP "store" mode so the archive is deterministic and needs no
+ * third-party compression library; ICO/PNG assets are already compressed.
+ */
+export async function zipFiles(files: ZipFile[]): Promise<Blob> {
+  if (!files.length) throw new Error("No files were selected.");
+
+  const entries: {
+    name: Uint8Array;
+    data: Uint8Array;
+    crc: number;
+    offset: number;
+  }[] = [];
+
+  let offset = 0;
+  const MAX_ZIP_BYTES = 500 * 1024 * 1024;
+
+  for (const file of files) {
+    const name = utf8(file.name);
+    const data = new Uint8Array(await file.blob.arrayBuffer());
+
+    if (name.length === 0 || name.length > 0xffff) {
+      throw new Error("A selected file name is too long.");
+    }
+    if (data.byteLength > 0xffffffff) {
+      throw new Error("A selected file is too large for a ZIP archive.");
+    }
+
+    const localSize = 30 + name.length + data.length;
+    if (!Number.isSafeInteger(offset + localSize) || offset + localSize > MAX_ZIP_BYTES) {
+      throw new Error("The ZIP archive would be too large to create safely in the browser.");
+    }
+
+    entries.push({ name, data, crc: crc32(data), offset });
+    offset += localSize;
+  }
+
+  const centralSize = entries.reduce((sum, entry) => sum + 46 + entry.name.length, 0);
+  const totalSize = offset + centralSize + 22;
+  if (!Number.isSafeInteger(totalSize) || totalSize > MAX_ZIP_BYTES) {
+    throw new Error("The ZIP archive would be too large to create safely in the browser.");
+  }
+
+  const output = new Uint8Array(totalSize);
+  const view = new DataView(output.buffer);
+  let cursor = 0;
+
+  for (const entry of entries) {
+    zipU32(view, cursor, 0x04034b50);
+    zipU16(view, cursor + 4, 20);
+    zipU16(view, cursor + 6, 0x800);
+    zipU16(view, cursor + 8, 0);
+    zipU16(view, cursor + 10, 0);
+    zipU16(view, cursor + 12, 0);
+    zipU32(view, cursor + 14, entry.crc);
+    zipU32(view, cursor + 18, entry.data.length);
+    zipU32(view, cursor + 22, entry.data.length);
+    zipU16(view, cursor + 26, entry.name.length);
+    zipU16(view, cursor + 28, 0);
+    output.set(entry.name, cursor + 30);
+    output.set(entry.data, cursor + 30 + entry.name.length);
+    cursor += 30 + entry.name.length + entry.data.length;
+  }
+
+  const centralDirectoryOffset = cursor;
+  for (const entry of entries) {
+    zipU32(view, cursor, 0x02014b50);
+    zipU16(view, cursor + 4, 20);
+    zipU16(view, cursor + 6, 20);
+    zipU16(view, cursor + 8, 0x800);
+    zipU16(view, cursor + 10, 0);
+    zipU16(view, cursor + 12, 0);
+    zipU16(view, cursor + 14, 0);
+    zipU32(view, cursor + 16, entry.crc);
+    zipU32(view, cursor + 20, entry.data.length);
+    zipU32(view, cursor + 24, entry.data.length);
+    zipU16(view, cursor + 28, entry.name.length);
+    zipU16(view, cursor + 30, 0);
+    zipU16(view, cursor + 32, 0);
+    zipU16(view, cursor + 34, 0);
+    zipU16(view, cursor + 36, 0);
+    zipU32(view, cursor + 38, 0);
+    zipU32(view, cursor + 42, entry.offset);
+    output.set(entry.name, cursor + 46);
+    cursor += 46 + entry.name.length;
+  }
+
+  zipU32(view, cursor, 0x06054b50);
+  zipU16(view, cursor + 4, 0);
+  zipU16(view, cursor + 6, 0);
+  zipU16(view, cursor + 8, entries.length);
+  zipU16(view, cursor + 10, entries.length);
+  zipU32(view, cursor + 12, centralSize);
+  zipU32(view, cursor + 16, centralDirectoryOffset);
+  zipU16(view, cursor + 20, 0);
+
+  return new Blob([output], { type: "application/zip" });
+}

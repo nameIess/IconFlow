@@ -51,41 +51,38 @@ function cleanUrl(value: string, base: string): string | null {
 }
 
 function findAssets(html: string, base: string): { icnsUrl: string | null; previewUrl: string | null } {
-  // Nuxt serializes the icon record as JSON inside __NUXT_DATA__ and escapes
-  // slashes as "\/". Normalize those escapes before looking for asset URLs.
   const normalized = html
-    .replaceAll("\\/", "/")
-    .replaceAll("\\u002F", "/")
-    .replaceAll("&amp;", "&");
+    .replaceAll("\\/","/")
+    .replaceAll("\\u002F","/")
+    .replaceAll("&amp;","&");
 
   const icnsCandidates: string[] = [];
   const previewCandidates: string[] = [];
-  const patterns = [
-    { target: "icns", regex: /"icnsUrl"\s*:\s*"([^"]+)"/gi },
-    { target: "preview", regex: /"lowResPngUrl"\s*:\s*"([^"]+)"/gi },
-    { target: "preview", regex: /"pngUrl"\s*:\s*"([^"]+)"/gi },
-    { target: "generic", regex: /(?:href|src|content|data-src)\s*=\s*["']([^"']+)["']/gi },
-    { target: "generic", regex: /https?:\/\/[^\s"'<>\\]+/gi },
-  ];
 
-  for (const pattern of patterns) {
-    for (const match of normalized.matchAll(pattern)) {
-      const value = match[1] ?? match[0];
-      const url = cleanUrl(value, base);
-      if (!url) continue;
-      if (pattern.target === "icns" || /\.icns(?:$|[?#])/i.test(url)) {
-        icnsCandidates.push(url);
-      } else {
-        previewCandidates.push(url);
-      }
+  // The share page embeds the downloadable assets in its Nuxt payload.
+  // Extract only the trusted macOSicons CDN host so unrelated page images
+  // can never become an imported asset.
+  const assetPattern = /https:\/\/s3-new\.macosicons\.com\/[^\s"'<>\\]+/gi;
+  for (const match of normalized.matchAll(assetPattern)) {
+    const url = cleanUrl(match[0], base);
+    if (!url) continue;
+
+    if (/\.icns(?:$|[?#])/i.test(url)) {
+      icnsCandidates.push(url);
+    } else if (/\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(url)) {
+      previewCandidates.push(url);
     }
   }
 
+  // Prefer the dedicated low-res PNG that macOSicons uses for its page
+  // preview. Fall back to any trusted image only if it is present.
   const uniqueIcns = [...new Set(icnsCandidates)];
   const uniquePreview = [...new Set(previewCandidates)];
+  const lowResPreview = uniquePreview.find((url) => /\/low_res_[^/]+\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(url));
+
   return {
     icnsUrl: uniqueIcns.find((url) => /\.icns(?:$|[?#])/i.test(url)) ?? null,
-    previewUrl: uniquePreview.find((url) => /\.(?:png|jpe?g|webp)(?:$|[?#])/i.test(url)) ?? null,
+    previewUrl: lowResPreview ?? uniquePreview[0] ?? null,
   };
 }
 
