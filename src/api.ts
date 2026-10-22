@@ -419,6 +419,29 @@ export type ImportedIconResult = {
   usedBackup: boolean;
 };
 
+async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: string; previewUrl?: string }> {
+  const endpoint = `/api/resolve-icon?url=${encodeURIComponent(url)}`;
+  const response = await fetch(endpoint, { cache: "no-store" });
+  const body: unknown = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body
+      ? (body as { error?: unknown }).error
+      : null;
+    throw new Error(typeof message === "string" ? message : "Unable to resolve the macOSicons share URL.");
+  }
+
+  if (!body || typeof body !== "object" || typeof (body as { assetUrl?: unknown }).assetUrl !== "string") {
+    throw new Error("The macOSicons resolver returned no downloadable icon.");
+  }
+
+  const value = body as { assetUrl: string; previewUrl?: unknown };
+  return {
+    assetUrl: value.assetUrl,
+    previewUrl: typeof value.previewUrl === "string" ? value.previewUrl : undefined,
+  };
+}
+
 export async function importIconUrls(urls: string[]): Promise<ImportedIconResult> {
   const hits: IconHit[] = [];
   const failed: string[] = [];
