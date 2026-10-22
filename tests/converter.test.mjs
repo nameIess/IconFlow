@@ -39,7 +39,7 @@ test("ICNS parser rejects unsupported PNG dimensions", () => {
 });
 
 test("download filenames sanitize unsafe characters and reserved device names", () => {
-  assert.equal(filename('../My:Icon?.', 'ico'), '.. My Icon .ico');
+  assert.equal(filename('../My:Icon?.', 'ico'), '.. My Icon.ico');
   assert.equal(filename('CON', 'ico'), '_CON.ico');
   assert.equal(filename('   ', 'exe'), 'icon.png');
 });
