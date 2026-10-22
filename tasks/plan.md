@@ -33,11 +33,12 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Phase 2: Regression tests and CI
 - [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, import URL allow-listing/deduplication/caps, and resolver rejection of unsafe URLs/redirects, MIME types, and oversized responses. Tests are authored but execution remains unverified.
 - [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. Vercel deployment for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688` is `READY`, confirming the production build passed after restoring `resolveMacosiconsShareUrl` accidentally removed during parser extraction. GitHub Actions jobs still fail before receiving a runner (runner ID 0, no steps/logs), so `npm test` and `npm audit` remain unverified.
+- [ ] Task 6: Run regression tests and the dependency audit, capture results, and fix any failures. Vercel deployment for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688` is `READY`, confirming dependency installation and `npm run build` (TypeScript build plus Vite production build). GitHub Actions jobs still fail before receiving a runner (runner ID 0, no steps/logs), so `npm test` and `npm audit` remain unverified.
 
 ### Checkpoint: Quality gates
 - [ ] Successful CI runs for the feature branch and pull requests targeting `master` (latest feature-branch run failed before any steps were reported).
-- [ ] Tests, typecheck, and build pass locally or in CI with captured results. Latest Actions run failed before steps were reported (steps are null; no logs are available), so these checks remain unverified.
+- [x] Typecheck and production build pass in the latest Vercel deployment (`35d5693349efe23b956e4fccb836d9fa1f3a7688`).
+- [ ] Regression tests pass with captured results; GitHub Actions did not start any steps, so test execution remains unverified.
 - [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed because GitHub Actions jobs never reached a runner.
 
 ### Phase 3: Resolver hardening and documentation
@@ -53,7 +54,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Focus trapping breaks nested controls or active import behavior | High | Test each dialog and keep close behavior consistent with current state guards |
-| A local in-memory rate limiter is ineffective on serverless multi-instance deployments | High | Use a shared store or platform-level limit when available; state any limitation explicitly |
+| A local in-memory rate limiter is ineffective on serverless multi-instance deployments | High | A platform-level Vercel Firewall per-IP rule is active; keep its path/threshold documented and verify it after deployment changes. |
 | Adding a test runner changes lockfile/dependency graph | Medium | Add only required dev dependencies and commit the matching lockfile |
 | Dependency audit fails because of a real advisory or registry issue | Medium | Preserve the failure output; fix or document a specific exception rather than silently skipping the gate |
 | Browser preview remains inaccessible | Medium | Use CI/build evidence and report browser validation as unverified instead of claiming success |
