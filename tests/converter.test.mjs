@@ -33,8 +33,8 @@ test("ICNS parser extracts a supported PNG representation", () => {
   assert.deepEqual(Array.from(png.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 });
 
-test("ICNS parser rejects unsupported PNG dimensions", () => {
-  assert.throws(() => extractBestPng(makeIcns({ width: 0 })), /dimensions/);
+test("ICNS parser rejects unsupported PNG dimensions when no supported representation remains", () => {
+  assert.throws(() => extractBestPng(makeIcns({ width: 0 })), /representation not supported/);
   assert.throws(() => extractBestPng(makeIcns({ width: 2048 })), /representation not supported/);
 });
 
