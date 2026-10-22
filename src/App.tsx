@@ -93,6 +93,25 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    if (!settingsOpen && !importOpen && !preview) return;
+
+    function handleDialogKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (preview) {
+        previewGeneration.current += 1;
+        setPreview(null);
+      } else if (importOpen) {
+        if (!importLoading) setImportOpen(false);
+      } else if (settingsOpen) {
+        setSettingsOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => window.removeEventListener("keydown", handleDialogKeyDown);
+  }, [settingsOpen, importOpen, importLoading, preview]);
+
+  useEffect(() => {
     return () => {
       if (preview?.url) URL.revokeObjectURL(preview.url);
     };
