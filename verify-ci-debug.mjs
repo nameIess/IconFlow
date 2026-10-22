@@ -17,7 +17,7 @@ const converterCases = [
   ["declared ICNS length", "mismatched declared file length"],
   ["ICNS entry bounds", "entries extending beyond the file"],
   ["PNG representation extraction", "extracts a supported PNG representation"],
-  ["PNG dimensions", "unsupported PNG dimensions"],
+  ["PNG dimensions", "unsupported PNG dimensions when no supported representation remains"],
   ["filename safety", "download filenames sanitize unsafe characters"],
   ["empty ZIP", "ZIP builder rejects an empty selection"],
   ["ZIP file structure", "ZIP builder writes a valid local-file signature"],
