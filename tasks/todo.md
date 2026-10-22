@@ -11,7 +11,7 @@
 - [x] Add converter validation, filename sanitization, ZIP boundary, import URL allow-listing/deduplication/cap tests, and resolver URL/redirect/MIME/size safeguard tests. Execution is still pending.
 - [x] Update `.github/workflows/ci.yml` for PRs to `master`, pushes to `master` and `feature/**`, and manual dispatch.
 - [x] Retain least-privilege permissions, immutable action SHAs, lockfile install, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Run tests, typecheck, and dependency audit with captured results. GitHub Actions still fails before assigning a runner (`runner_id: 0`, no steps/logs) even on fresh branch `fix/vercel-ci-runner` after setting Node 24 directly and rerunning. Vercel reports `READY` for commit `396891ca5ef66e802847fd118f7418f54a6dad28`, confirming the Vercel install/build path succeeds. `npm test` and `npm audit` remain unverified because GitHub never ran a step and this runtime cannot resolve `github.com` for a local install.
+- [ ] Run tests, typecheck, and dependency audit with captured results. GitHub Actions still fails before assigning a runner (`runner_id: 0`, no steps/logs) even on fresh branch `fix/vercel-ci-runner` after setting Node 24 directly and rerunning. Vercel reports `READY` for commit `396891ca5ef66e802847fd118f7418f54a6dad28`, and the Vercel GitHub app posted a Ready preview on PR #2 (`https://icon-flow-git-fix-vercel-ci-runner-nameiess.vercel.app`), confirming Vercel deployment succeeds. `npm test` and `npm audit` remain unverified because GitHub never ran a step and this runtime cannot resolve `github.com` for a local install.
 - [ ] Checkpoint: confirm successful branch and pull-request CI runs.
 
 ## Phase 3 — Resolver and docs
