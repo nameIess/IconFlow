@@ -7,8 +7,8 @@ const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 
 function token(block, name) {
-  const match = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})\\s*;`));
-  assert.ok(match, `Expected ${name} color token`);
+  const match = block.match(new RegExp(\`--\${name}:\\\\s*(#[0-9a-fA-F]{6})\\\\s*;\`));
+  assert.ok(match, \`Expected \${name} color token\`);
   return match[1];
 }
 
@@ -27,14 +27,12 @@ function contrastRatio(foreground, background) {
 }
 
 test("light-theme secondary text meets WCAG AA normal-text contrast", () => {
-  const lightTheme = styles.match(/:root\\[data-theme="light"\\]\\s*\\{([^}]+)\\}/);
+  const lightTheme = styles.match(/:root\[data-theme="light"\]\s*\{([^}]+)\}/);
   assert.ok(lightTheme, "Expected a light-theme token block");
   const foreground = token(lightTheme[1], "muted-2");
   const background = token(lightTheme[1], "bg");
-  assert.ok(
-    contrastRatio(foreground, background) >= 4.5,
-    `Expected at least 4.5:1 contrast, got ${contrastRatio(foreground, background).toFixed(2)}:1`
-  );
+  const ratio = contrastRatio(foreground, background);
+  assert.ok(ratio >= 4.5, \`Expected at least 4.5:1 contrast, got \${ratio.toFixed(2)}:1\`);
 });
 
 test("all custom dialogs expose focusable dialog containers and keyboard focus containment", () => {
@@ -45,8 +43,8 @@ test("all custom dialogs expose focusable dialog containers and keyboard focus c
 });
 
 test("CI runs on master and feature branch pushes and on pull requests to master", () => {
-  assert.match(workflow, /pull_request:[\\s\\S]*?branches:[\\s\\S]*?- master/);
-  assert.match(workflow, /push:[\\s\\S]*?branches:[\\s\\S]*?- master[\\s\\S]*?- ['"]feature\\/\\*\\*['"]/);
+  assert.ok(workflow.includes("pull_request:\n    branches:\n      - master"));
+  assert.ok(workflow.includes("push:\n    branches:\n      - master\n      - 'feature/**'"));
   assert.match(workflow, /npm run typecheck/);
   assert.match(workflow, /npm run build/);
   assert.match(workflow, /npm audit --audit-level=high/);
