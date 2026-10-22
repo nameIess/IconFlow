@@ -28,7 +28,7 @@
   --border-strong: rgba(15,23,42,.17);
   --text: #12151d;
   --muted: #60697a;
-  --muted-2: #7d8697;
+  --muted-2: #60697a;
   --accent: #326fe8;
   --accent-strong: #1e5cd6;
   --shadow: 0 24px 80px rgba(31,41,55,.14);
@@ -114,9 +114,9 @@ a { color: inherit; }
   border: 1px solid var(--border); color: var(--text); background: rgba(255,255,255,.04);
   transition: .18s ease; border-radius: 12px;
 }
-.icon-button { width: 38px; height: 38px; display: grid; place-items: center; }
+.icon-button { width: 44px; height: 44px; display: grid; place-items: center; flex: 0 0 44px; }
 .icon-button:hover, .settings-button:hover, .secondary-button:hover { background: rgba(255,255,255,.09); border-color: var(--border-strong); }
-.settings-button { height: 38px; padding: 0 13px; display: inline-flex; align-items: center; gap: 7px; }
+.settings-button { min-height: 44px; padding: 0 13px; display: inline-flex; align-items: center; gap: 7px; }
 
 main { position: relative; z-index: 1; width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
 .hero { padding: 108px 0 74px; text-align: center; }
