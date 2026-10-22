@@ -33,11 +33,11 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Phase 2: Regression tests and CI
 - [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, import URL allow-listing/deduplication/caps, and resolver rejection of unsafe URLs/redirects, MIME types, and oversized responses. Tests are authored but execution remains unverified.
 - [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Task 6: Run regression tests and the dependency audit, capture results, and fix any failures. Vercel deployment for commit `35d5693349efe23b956e4fccb836d9fa1f3a7688` is `READY`, confirming dependency installation and `npm run build` (TypeScript build plus Vite production build). GitHub Actions jobs still fail before receiving a runner (runner ID 0, no steps/logs), so `npm test` and `npm audit` remain unverified.
+- [ ] Task 6: Run regression tests and the dependency audit, capture results, and fix any failures. Vercel preview deployment is `READY` for current fix commit `396891ca5ef66e802847fd118f7418f54a6dad28`, confirming install and production build complete successfully in Vercel. GitHub Actions jobs still fail before receiving a runner (runner ID 0, no steps/logs), including the fresh `fix/vercel-ci-runner` branch after a direct Node 24 setup; `npm test` and `npm audit` remain unverified.
 
 ### Checkpoint: Quality gates
 - [ ] Successful CI runs for the feature branch and PR #2 targeting `master` (both fail before runner assignment; rerunning PR job attempt 2 still yielded zero steps).
-- [x] Typecheck and production build pass in the latest Vercel deployment (`35d5693349efe23b956e4fccb836d9fa1f3a7688`).
+- [x] Vercel install and production build pass for the fix branch commit (`396891ca5ef66e802847fd118f7418f54a6dad28`).
 - [ ] Regression tests pass with captured results; GitHub Actions did not start any steps, so test execution remains unverified.
 - [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed because GitHub Actions jobs never reached a runner.
 
@@ -46,7 +46,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Finish runtime/browser verification. Source-level review is complete. Vercel preview builds are `READY` for commits `35d5693349efe23b956e4fccb836d9fa1f3a7688` and `396891ca5ef66e802847fd118f7418f54a6dad28`; however, the connected Vercel account denied preview access (403) and the local runtime cannot resolve `github.com`, so browser smoke tests and local npm commands remain blocked. A CI adjustment to use explicit Node 24 and trigger on `fix/**` was committed as `396891ca5ef66e802847fd118f7418f54a6dad28`; it did not resolve the runner startup failure.
+- [ ] Finish runtime/browser verification. Source-level review is complete. Vercel preview builds are `READY` for commits `35d5693349efe23b956e4fccb836d9fa1f3a7688` and `396891ca5ef66e802847fd118f7418f54a6dad28`; however, the connected Vercel account denied preview access and sandbox creation (403), and the local runtime cannot resolve `github.com`, so browser smoke tests and local npm commands remain blocked. A CI adjustment to use explicit Node 24 and trigger on `fix/**` was committed as `396891ca5ef66e802847fd118f7418f54a6dad28`; it did not resolve the runner startup failure.
 - [x] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits at source level; no runtime security test has been performed.
 - [ ] Run a browser-level smoke test for search, import, preview, and download; Vercel access-bypass was denied (403) and the Vercel sandbox-creation API also denied permission (403), so browser-level checks could not be run here.
 
