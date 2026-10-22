@@ -12,7 +12,7 @@ Thank you for helping improve IconFlow! Contributions are welcome, including bug
 ### Set up the project
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/nameIess/IconFlow.git
 cd IconFlow
 npm ci
 npm run dev
