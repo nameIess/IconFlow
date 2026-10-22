@@ -38,7 +38,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 
 ### Checkpoint: Quality gates
 - [x] Vercel quality gate (tests, typecheck, production build, high-severity dependency audit) passed for the fix branch. The gate is enforced by `vercel.json` for future Vercel deployments.
-- [ ] Successful GitHub Actions run. Actions jobs still fail before runner allocation (runner ID 0, no steps or logs) even after explicitly pinning Node 24, using a fresh fix branch/PR, and retrying. This has not been traced to a source-level workflow step because no step executes.
+- [ ] Successful GitHub Actions run. Actions jobs still fail before runner allocation (`runner_id: 0`, no steps or logs) on both `ubuntu-latest` and the pinned `ubuntu-24.04`, after Node 24 setup, a fresh fix branch/PR, and retrying. This has not been traced to a source-level workflow step because no step executes. GitHub's public status page currently reports Actions operational; account-level hosted-runner provisioning, spending limits, and Actions permissions cannot be inspected through the available connection.
 - [x] A clean Vercel preview deployment is READY after removing the temporary diagnostics script; `verify-ci-debug.mjs` is not present on the branch.
 - [x] The full dependency audit ran successfully as part of the Vercel quality gate at `npm audit --audit-level=high`.
 
@@ -49,7 +49,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Checkpoint: Release readiness
 - [x] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits at source level.
 - [ ] Run browser-level smoke tests for search, import, preview, keyboard focus, and download. The connected Vercel account denied authenticated preview bypass and sandbox creation (403), so these interactive checks remain unverified.
-- [ ] Resolve GitHub Actions runner allocation at the repository/account level. The job starts and immediately fails with runner ID 0 and an empty step list; reruns show the same signature.
+- [ ] Resolve GitHub Actions runner allocation at the repository/account level. The job starts and immediately fails with `runner_id: 0` and an empty step list on both standard Ubuntu labels; reruns show the same signature. Check repository owner Billing & plans → Plans and usage → Actions/spending limits, and Settings → Actions → General/ Runners. These owner-level settings are inaccessible to this connection.
 - [ ] Merge PR #2 only after GitHub Actions becomes operational and its required check is green. Do not bypass the outstanding check solely because the Vercel gate passes.
 
 ## Risks and Mitigations
