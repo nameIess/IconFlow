@@ -35,6 +35,12 @@ test("light-theme secondary text meets WCAG AA normal-text contrast", () => {
   assert.ok(ratio >= 4.5, `Expected at least 4.5:1 contrast, got ${ratio.toFixed(2)}:1`);
 });
 
+test("icon-only and mobile settings controls retain 44px touch targets", () => {
+  assert.match(styles, /\.icon-button\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px/s);
+  assert.match(styles, /\.settings-button\s*\{[^}]*min-height:\s*44px;/s);
+  assert.match(styles, /\.settings-button\s*\{[^}]*width:\s*44px;[^}]*min-width:\s*44px;/s);
+});
+
 test("all custom dialogs expose focusable dialog containers and keyboard focus containment", () => {
   assert.equal((app.match(/role="dialog" aria-modal="true"/g) || []).length, 3);
   assert.equal((app.match(/role="dialog" aria-modal="true"[^>]*tabIndex=\{?-1\}?/g) || []).length, 3);
