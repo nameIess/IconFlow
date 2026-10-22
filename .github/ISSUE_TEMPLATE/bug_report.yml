@@ -1,0 +1,67 @@
+name: "🐛 Bug report"
+description: Report a reproducible problem in IconFlow
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve **IconFlow**! Please search existing issues first, then share enough detail for us to reproduce the problem.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug clearly. What did you expect to happen instead?
+      placeholder: "When I…, I expected…, but…"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Where did you encounter the problem?
+      options:
+        - Icon search
+        - Icon editor / masking
+        - AI icon generation
+        - Image conversion / export
+        - Background removal
+        - Favicon or release pack
+        - API / authentication
+        - Usage limits / billing
+        - Website / UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps. Include a minimal example if possible.
+      placeholder: |
+        1. Open…
+        2. Choose…
+        3. Click…
+        4. Observe…
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or response
+      description: Paste relevant error messages, HTTP status codes, request IDs, or screenshots. Remove API keys and other secrets before posting.
+      render: text
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser/OS, app version or commit, and runtime if relevant.
+      placeholder: "e.g. macOS 15, Chrome, API client"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and could not find a duplicate.
+          required: true
+        - label: I removed API keys, tokens, and other sensitive data from this report.
+          required: true

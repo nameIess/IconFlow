@@ -1,0 +1,58 @@
+name: "✨ Feature request"
+description: Suggest an improvement or a new capability for IconFlow
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for **IconFlow**? Tell us about the problem first, then describe the smallest useful solution. Clear use cases help us evaluate requests.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Explain the friction, limitation, or user need behind your idea.
+      placeholder: "I often need to… Today, I have to…"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the experience or behavior you would like to see.
+      placeholder: "It would be useful if IconFlow could…"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      options:
+        - Icon search and discovery
+        - Icon editing and customization
+        - AI generation
+        - Conversion and export
+        - Background removal
+        - API and developer experience
+        - Performance and reliability
+        - Accessibility and UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workaround, existing tool, or alternative approach you have tried.
+      placeholder: "So far, I've tried…"
+  - type: textarea
+    id: extra
+    attributes:
+      label: Examples or additional context
+      description: Links, mockups, sample inputs, or other details that help explain the idea.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for a similar request.
+          required: true
