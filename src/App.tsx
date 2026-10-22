@@ -316,7 +316,7 @@ function App() {
     if (!sourceUrl) return setToast("This result has no downloadable icon asset.");
 
     const id = hitId(hit, index);
-    setBusyId(id);
+    setBusyId(`${id}::${format}`);
     try {
       const blob = hit.icnsUrl
         ? (format === "ico"
@@ -607,8 +607,8 @@ function App() {
           <div className="creator-line"><span>{preview.hit.credit || preview.hit.uploadedBy || "macOSicons"}</span>{safeCreditUrl(preview.hit.creditUrl) && <a href={preview.hit.creditUrl} target="_blank" rel="noopener noreferrer">Creator <ExternalLink size={12} /></a>}</div>
           <div className="preview-actions">
             {(["ico", "png"] as Format[]).map((format) => (
-              <button key={format} className={format === defaultFormat ? "primary-button preview-download" : "secondary-button preview-download"} disabled={preview.loading || busyId === hitId(preview.hit, Math.max(0, results.indexOf(preview.hit)))} onClick={() => void downloadIcon(preview.hit, format, Math.max(0, results.indexOf(preview.hit)))}>
-                {busyId === hitId(preview.hit, Math.max(0, results.indexOf(preview.hit))) ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+              <button key={format} className={format === defaultFormat ? "primary-button preview-download" : "secondary-button preview-download"} disabled={preview.loading || Boolean(busyId?.startsWith(`${hitId(preview.hit, Math.max(0, results.indexOf(preview.hit)))}::`))} onClick={() => void downloadIcon(preview.hit, format, Math.max(0, results.indexOf(preview.hit)))} >
+                {busyId === `${hitId(preview.hit, Math.max(0, results.indexOf(preview.hit)))}::${format}` ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
                 Download {format.toUpperCase()}{format === defaultFormat ? " · Default" : ""}
               </button>
             ))}
