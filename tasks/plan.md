@@ -21,31 +21,31 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ## Task List
 
 ### Phase 1: Confirmed UI accessibility issues
-- [ ] Task 1: Correct light-theme secondary text contrast.
-- [ ] Task 2: Add modal focus entry, focus containment, and focus restoration; preserve Escape/backdrop behavior and import-in-progress restrictions.
-- [ ] Task 3: Review icon/settings controls for practical touch target sizing and adjust only where needed.
+- [x] Task 1: Correct light-theme secondary text contrast (4.89:1 on the light page background).
+- [x] Task 2: Add modal focus entry, focus containment, and focus restoration in source; browser behavior still requires verification.
+- [x] Task 3: Increase icon-only and settings controls to at least 44px.
 
 ### Checkpoint: UI
-- [ ] Calculate contrast ratios for the adjusted token against the actual light-theme surface.
+- [x] Calculate contrast ratio for the adjusted token against the light-theme page surface.
 - [ ] Verify keyboard opening/closing and focus return for import, settings, and preview dialogs.
 - [ ] Verify short-screen dialog scrolling and reduced-motion behavior remain intact.
 
 ### Phase 2: Regression tests and CI
-- [ ] Task 4: Add focused automated tests for core converter/input validation and import/resolver edge cases using the chosen test runner.
-- [ ] Task 5: Update `.github/workflows/ci.yml` so pull requests and relevant branch pushes receive checks, including this feature branch; retain manual dispatch, locked installs, typecheck/build, and high-severity dependency audit enforcement.
+- [ ] Task 4: Expand automated tests beyond the initial token/focus/CI contract checks to cover converter validation and import/resolver edge cases.
+- [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
 - [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures.
 
 ### Checkpoint: Quality gates
-- [ ] CI runs for the feature branch and pull requests targeting `master`.
-- [ ] Tests, typecheck, and build pass locally or in CI with captured results.
+- [ ] Successful CI runs for the feature branch and pull requests targeting `master` (runs were triggered, but observed jobs failed before steps were reported).
+- [ ] Tests, typecheck, and build pass locally or in CI with captured results; Actions did not provide step logs for the observed failures.
 - [ ] Dependency audit outcome is explicitly reported and enforced.
 
 ### Phase 3: Resolver hardening and documentation
-- [ ] Task 7: Review resolver request abuse limits and add a deployment-compatible rate limit or document/implement a reliable upstream limit; preserve host allowlists, redirect checks, timeout, and response-size caps.
-- [ ] Task 8: Document the existing design tokens, modal interaction contract, test commands, and release verification steps.
+- [ ] Task 7: Configure a reliable shared or platform-level resolver rate limit once the deployment-supported mechanism is confirmed; `DESIGN.md` documents the remaining gap and current safeguards.
+- [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Review the final diff for unintended changes.
+- [ ] Review the final diff for unintended changes and finish runtime/browser verification.
 - [ ] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits.
 - [ ] Run a browser-level smoke test for search, import, preview, and download; record any checks blocked by unavailable credentials or preview access.
 
