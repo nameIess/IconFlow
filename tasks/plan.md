@@ -36,18 +36,18 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. GitHub Actions jobs currently fail before receiving a runner (runner ID 0, no steps/logs); this is an infrastructure blocker, not evidence that the checks pass.
 
 ### Checkpoint: Quality gates
-- [ ] Successful CI runs for the feature branch and pull requests targeting `master` (runs were triggered, but observed jobs failed before steps were reported).
-- [ ] Tests, typecheck, and build pass locally or in CI with captured results; Actions did not provide step logs for the observed failures.
-- [ ] Dependency audit outcome is explicitly reported and enforced.
+- [ ] Successful CI runs for the feature branch and pull requests targeting `master` (latest feature-branch run failed before any steps were reported).
+- [ ] Tests, typecheck, and build pass locally or in CI with captured results. Latest Actions run failed before steps were reported (steps are null; no logs are available), so these checks remain unverified.
+- [ ] Dependency audit outcome is explicitly reported and enforced; the audit step has not executed in the observed failed Actions runs.
 
 ### Phase 3: Resolver hardening and documentation
 - [ ] Task 7: Configure a reliable shared or platform-level resolver rate limit once the deployment-supported mechanism is confirmed; `DESIGN.md` documents the remaining gap and current safeguards.
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Review the final diff for unintended changes and finish runtime/browser verification. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
+- [ ] Review the final diff for unintended changes and finish runtime/browser verification. A local clone was attempted but the environment could not resolve `github.com`, preventing local commands. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
 - [ ] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits.
-- [ ] Run a browser-level smoke test for search, import, preview, and download; record any checks blocked by unavailable credentials or preview access.
+- [ ] Run a browser-level smoke test for search, import, preview, and download; preview access was previously blocked by Vercel protection and no browser automation is available in this execution environment.
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
