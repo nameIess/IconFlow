@@ -16,7 +16,7 @@
 
 ## Phase 3 — Resolver and docs
 - [x] Configure and verify the active Vercel Firewall rule: `/api/resolve-icon`, 120 requests per IP per 60-second window, deny mitigation.
-- [x] Document current resolver safeguards and the remaining rate-limit gap.
+- [x] Document current resolver safeguards and the active platform-level rate limit.
 - [x] Document design tokens, modal behavior, and verification commands in `DESIGN.md`.
 - [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. Vercel explicitly denied deployment access (403); this environment also cannot clone the repository or run browser automation. The preview URL currently returns 403 through the connected Vercel account.
 - [ ] Final release-readiness verification. Source-level review of the touched files and key security safeguards is complete; runtime checks are blocked by GitHub Actions failing before steps, DNS resolution failure for `github.com`, and Vercel access denial.
