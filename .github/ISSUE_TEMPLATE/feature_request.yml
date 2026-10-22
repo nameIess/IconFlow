@@ -1,7 +1,6 @@
 name: "✨ Feature request"
 description: Propose an improvement or capability for IconFlow
 title: "[Feature]: "
-labels: ["enhancement", "triage"]
 body:
   - type: markdown
     attributes:
