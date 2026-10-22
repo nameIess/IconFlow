@@ -191,7 +191,7 @@ footer a { margin-left: auto; display: inline-flex; gap: 4px; align-items: cente
 .toast { position: fixed; z-index: 100; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 12px 16px; border-radius: 14px; font-size: 12px; max-width: min(90vw, 520px); text-align: center; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; padding: 20px; display: grid; place-items: center; background: rgba(0,0,0,.48); backdrop-filter: blur(16px); }
-.settings-modal, .preview-modal { width: min(520px, 100%); border-radius: 24px; padding: 22px; }
+.settings-modal, .preview-modal { width: min(520px, 100%); max-height: min(760px, calc(100dvh - 40px)); overflow-y: auto; overscroll-behavior: contain; border-radius: 24px; padding: 22px; }
 .preview-modal { width: min(620px, 100%); }
 .modal-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 22px; }
 .key-card { display: flex; gap: 12px; padding: 13px; border: 1px solid var(--border); border-radius: 15px; background: rgba(255,255,255,.035); margin-bottom: 18px; }
