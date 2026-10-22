@@ -398,7 +398,7 @@ function importHitMatchesId(hit: IconHit, id: string): boolean {
   return candidateValues.some((value) => value.includes(target));
 }
 
-async function resolveMacosiconsShareUrl(url: string): Promise<string> {
+async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: string; previewUrl?: string }> {
   const endpoint = `/api/resolve-icon?url=${encodeURIComponent(url)}`;
   const response = await fetch(endpoint, { cache: "no-store" });
   const body: unknown = await response.json().catch(() => null);
@@ -414,7 +414,11 @@ async function resolveMacosiconsShareUrl(url: string): Promise<string> {
     throw new Error("The macOSicons resolver returned no downloadable icon.");
   }
 
-  return (body as { assetUrl: string }).assetUrl;
+  const value = body as { assetUrl: string; previewUrl?: unknown };
+  return {
+    assetUrl: value.assetUrl,
+    previewUrl: typeof value.previewUrl === "string" ? value.previewUrl : undefined,
+  };
 }
 
 export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
@@ -468,8 +472,12 @@ export async function importIconUrls(urls: string[]): Promise<ImportedIconResult
 
     try {
       let assetUrl = url.toString();
+      let previewAssetUrl: string | undefined;
+
       if (MACOSICONS_HOSTS.has(url.hostname.toLowerCase())) {
-        assetUrl = await resolveMacosiconsShareUrl(assetUrl);
+        const resolved = await resolveMacosiconsShareUrl(assetUrl);
+        assetUrl = resolved.assetUrl;
+        previewAssetUrl = resolved.previewUrl;
       } else if (!(url.hostname.toLowerCase() === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname))) {
         failed.push(raw);
         continue;
@@ -483,6 +491,10 @@ export async function importIconUrls(urls: string[]): Promise<ImportedIconResult
         continue;
       }
 
+      if (previewAssetUrl && !isTrustedImageUrl(previewAssetUrl)) {
+        throw new Error("The macOSicons resolver returned an untrusted preview URL.");
+      }
+
       const name = decodeURIComponent(asset.pathname.split("/").filter(Boolean).pop() || "Imported icon")
         .replace(/\.(?:icns|png|jpe?g|webp)$/i, "")
         .replace(/[-_]+/g, " ")
@@ -491,7 +503,7 @@ export async function importIconUrls(urls: string[]): Promise<ImportedIconResult
       hits.push({
         appName: name || "Imported icon",
         icnsUrl: isIcns ? asset.toString() : undefined,
-        lowResPngUrl: isImage ? asset.toString() : undefined,
+        lowResPngUrl: previewAssetUrl || (isImage ? asset.toString() : undefined),
         objectID: raw,
       });
     } catch {
