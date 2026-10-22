@@ -33,6 +33,7 @@ Create a local `.env` file from `.env.example` when environment configuration is
 Run the checks relevant to your change before opening a pull request:
 
 ```bash
+npm test
 npm run typecheck
 npm run build
 ```
