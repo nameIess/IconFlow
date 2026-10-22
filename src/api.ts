@@ -1,4 +1,4 @@
-import { MACOSICONS_HOSTS, parseImportUrl, parseIconImportText } from "./import-parser";
+import { MACOSICONS_HOSTS, parseImportUrl } from "./import-parser";
 export { parseIconImportText } from "./import-parser";
 
 export type IconHit = {
