@@ -81,7 +81,7 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 
 Node.js 24 is used in CI (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
 
-CI runs `npm ci --ignore-scripts --no-fund`, checks dependencies with `npm audit --audit-level=high`, and runs the typecheck/build even when the audit reports a vulnerability. A final enforcement step keeps the audit a required gate without hiding unrelated build failures. The workflow runs on pull requests targeting `master` and manual dispatch; it does not run on every push.
+CI runs `npm ci --no-audit --no-fund`, `npm test`, the typecheck, production build, and `npm audit --audit-level=high`. Audit failures are enforced after the typecheck/build steps so they do not hide unrelated build failures. The workflow runs on pull requests targeting `master`, pushes to `master` and `feature/**`, and manual dispatch.
 
 ## Contributing 🤝
 
