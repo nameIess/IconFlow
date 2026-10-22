@@ -11,12 +11,12 @@
 - [x] Add converter validation, filename sanitization, ZIP boundary, import URL allow-listing/deduplication/cap tests, and resolver URL/redirect/MIME/size safeguard tests. Execution is still pending.
 - [x] Update `.github/workflows/ci.yml` for PRs to `master`, pushes to `master` and `feature/**`, and manual dispatch.
 - [x] Retain least-privilege permissions, immutable action SHAs, lockfile install, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Run tests, typecheck, build, and dependency audit and capture successful results. Recent Actions runs still fail before runner assignment (`runner_id: 0`, no steps or logs). Vercel reports `READY` for the latest commit, confirming `npm run build` passes. `npm test` and `npm audit` remain unverified because Actions never started steps and this runtime cannot resolve github.com for a local install.
+- [ ] Run tests, typecheck, build, and dependency audit and capture successful results. Actions still fail before runner assignment (`runner_id: 0`, no steps or logs), even on fresh branch `fix/vercel-ci-runner` after setting Node 24 directly and rerunning. Vercel reports `READY` for commit `396891ca5ef66e802847fd118f7418f54a6dad28`, confirming Vercel's build passes. `npm test` and `npm audit` remain unverified because Actions never started steps and this runtime cannot resolve github.com for a local install.
 - [ ] Checkpoint: confirm successful branch and pull-request CI runs.
 
 ## Phase 3 — Resolver and docs
 - [x] Configure and verify the active Vercel Firewall rule: `/api/resolve-icon`, 120 requests per IP per 60-second window, deny mitigation.
 - [x] Document current resolver safeguards and the active platform-level rate limit.
 - [x] Document design tokens, modal behavior, and verification commands in `DESIGN.md`.
-- [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. Vercel explicitly denied deployment access (403); this environment also cannot clone the repository or run browser automation. The preview URL currently returns 403 through the connected Vercel account.
+- [ ] Run browser smoke tests for search, import, preview, and downloads where access is available. Vercel explicitly denied deployment access and sandbox creation (403); this environment also cannot clone the private repository through the standard network path or run browser automation. The preview URL currently returns 403 through the connected Vercel account.
 - [ ] Final release-readiness verification. Source-level review of the touched files and key security safeguards is complete; runtime checks are blocked by GitHub Actions failing before steps, DNS resolution failure for `github.com`, and Vercel access denial.
