@@ -33,7 +33,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 ### Phase 2: Regression tests and CI
 - [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, import URL allow-listing/deduplication/caps, and resolver rejection of unsafe URLs/redirects, MIME types, and oversized responses. Tests are authored but execution remains unverified.
 - [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. GitHub Actions jobs currently fail before receiving a runner (runner ID 0, no steps/logs); this is an infrastructure blocker, not evidence that the checks pass.
+- [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. GitHub Actions jobs currently fail before receiving a runner (runner ID 0, no steps/logs). Vercel also reports `npm run build` exited with code 1, but its build-log endpoint is returning 404 through the connected integration; the exact compiler error remains unknown.
 
 ### Checkpoint: Quality gates
 - [ ] Successful CI runs for the feature branch and pull requests targeting `master` (latest feature-branch run failed before any steps were reported).
