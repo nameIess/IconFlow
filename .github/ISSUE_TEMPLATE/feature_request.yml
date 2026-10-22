@@ -1,25 +1,28 @@
 name: "✨ Feature request"
-description: Suggest an improvement or a new capability for IconFlow
+description: Propose an improvement or capability for IconFlow
 title: "[Feature]: "
+labels: ["enhancement", "triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Have an idea for **IconFlow**? Tell us about the problem first, then describe the smallest useful solution. Clear use cases help us evaluate requests.
+        Help us understand the user need behind your idea. Search existing issues first; requests with a clear problem and use case are easier to evaluate.
+
+        Please don't include private user data, credentials, or confidential information.
   - type: textarea
     id: problem
     attributes:
-      label: What problem should this solve?
-      description: Explain the friction, limitation, or user need behind your idea.
-      placeholder: "I often need to… Today, I have to…"
+      label: What problem would this solve?
+      description: Describe the friction or limitation you encounter and who it affects.
+      placeholder: "When I need to…, the current workflow…"
     validations:
       required: true
   - type: textarea
     id: solution
     attributes:
       label: Proposed solution
-      description: Describe the experience or behavior you would like to see.
-      placeholder: "It would be useful if IconFlow could…"
+      description: Explain the behavior or workflow you would like to see. A specific implementation is optional.
+      placeholder: "It would help if IconFlow could…"
     validations:
       required: true
   - type: dropdown
@@ -34,25 +37,31 @@ body:
         - Background removal
         - API and developer experience
         - Performance and reliability
-        - Accessibility and UI
-        - Other
+        - Accessibility and interface
+        - Other / not sure
     validations:
       required: true
   - type: textarea
+    id: usecase
+    attributes:
+      label: Example use case
+      description: How would this help you? Describe a practical workflow or outcome.
+      placeholder: "I would use this to…"
+  - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
-      description: Any workaround, existing tool, or alternative approach you have tried.
+      label: Alternatives or workarounds
+      description: Mention existing tools, workarounds, or approaches you've tried.
       placeholder: "So far, I've tried…"
   - type: textarea
     id: extra
     attributes:
       label: Examples or additional context
-      description: Links, mockups, sample inputs, or other details that help explain the idea.
+      description: Add relevant links, mockups, or sample inputs. Only share material you are allowed to make public.
   - type: checkboxes
     id: checks
     attributes:
-      label: Before submitting
+      label: Submission checklist
       options:
         - label: I searched existing issues for a similar request.
           required: true
