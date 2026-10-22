@@ -31,9 +31,9 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [ ] Verify short-screen dialog scrolling and reduced-motion behavior remain intact.
 
 ### Phase 2: Regression tests and CI
-- [ ] Task 4: Expand automated tests beyond the initial token/focus/CI contract checks to cover converter validation and import/resolver edge cases.
+- [x] Task 4: Expand automated tests to cover ICNS validation, filename sanitization, ZIP archive boundaries, and import URL allow-listing/deduplication/caps. Tests are authored but execution remains unverified.
 - [x] Task 5: Update `.github/workflows/ci.yml` for pull requests to `master` and pushes to `master`/`feature/**`; retain manual dispatch, locked installs, typecheck/build, and enforced high-severity dependency audit.
-- [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures.
+- [ ] Task 6: Run and fix dependency installation, tests, typecheck, production build, and dependency audit; distinguish dependency findings from registry/transient failures. GitHub Actions jobs currently fail before receiving a runner (runner ID 0, no steps/logs); this is an infrastructure blocker, not evidence that the checks pass.
 
 ### Checkpoint: Quality gates
 - [ ] Successful CI runs for the feature branch and pull requests targeting `master` (runs were triggered, but observed jobs failed before steps were reported).
@@ -45,7 +45,7 @@ Close the confirmed issues from the static UI/security/release audit without bro
 - [x] Task 8: Document design tokens, modal interaction contract, test commands, and verification steps in `DESIGN.md`.
 
 ### Checkpoint: Release readiness
-- [ ] Review the final diff for unintended changes and finish runtime/browser verification.
+- [ ] Review the final diff for unintended changes and finish runtime/browser verification. Preview access was denied by Vercel; repository clone/install is also blocked here because the runtime cannot resolve github.com.
 - [ ] Recheck security headers, secret handling, trusted URL checks, and ICNS/image input limits.
 - [ ] Run a browser-level smoke test for search, import, preview, and download; record any checks blocked by unavailable credentials or preview access.
 
