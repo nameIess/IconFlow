@@ -37,7 +37,7 @@ test("light-theme secondary text meets WCAG AA normal-text contrast", () => {
 
 test("all custom dialogs expose focusable dialog containers and keyboard focus containment", () => {
   assert.equal((app.match(/role="dialog" aria-modal="true"/g) || []).length, 3);
-  assert.equal((app.match(/role="dialog" aria-modal="true"[^>]*tabIndex=\\{?-1\\}?/g) || []).length, 3);
+  assert.equal((app.match(/role="dialog" aria-modal="true"[^>]*tabIndex=\{?-1\}?/g) || []).length, 3);
   assert.match(app, /event\.key !== "Tab"/);
   assert.match(app, /dialogReturnFocusRef\.current\?\.focus\(\)/);
 });
