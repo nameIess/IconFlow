@@ -1,7 +1,7 @@
 name: IconFlow CI
 
 run-name: >-
-  IconFlow CI · ${{ github.event_name == 'pull_request'
+  IconFlow CI · \${{ github.event_name == 'pull_request'
   && format('PR #{0}', github.event.number)
   || github.ref_name }}
 
@@ -26,12 +26,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: iconflow-ci-${{ github.event.pull_request.number || github.ref }}
+  group: iconflow-ci-\${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Typecheck and production build
+    name: Tests, typecheck, audit, and production build
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.draft == false
@@ -57,11 +57,57 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
+      - name: Unit and integration tests
+        run: npm test
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Production build
         run: npm run build
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  container:
+    name: Build and smoke-test Docker Compose
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose configuration
+        run: docker compose -f docker/compose.yaml config --quiet
+
+      - name: Build and start containers
+        run: docker compose -f docker/compose.yaml up --build --detach --wait --wait-timeout 90
+
+      - name: Smoke-test frontend and resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error http://127.0.0.1:8080/ -o /tmp/iconflow-index.html
+          grep -q '<div id="root">' /tmp/iconflow-index.html
+          curl --fail --silent --show-error http://127.0.0.1:8080/healthz -o /dev/null
+          status="$(curl --silent --show-error --output /tmp/iconflow-api.json --write-out '%{http_code}' \
+            --get --data-urlencode 'url=https://example.com/' \
+            http://127.0.0.1:8080/api/resolve-icon)"
+          test "$status" = "400"
+          grep -q 'Only macOSicons HTTPS share URLs are supported' /tmp/iconflow-api.json
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f docker/compose.yaml logs --no-color
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f docker/compose.yaml down --volumes --remove-orphans
