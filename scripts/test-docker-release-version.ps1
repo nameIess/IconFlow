@@ -6,7 +6,6 @@ $validCases = @{
     'v3.1.0' = '3.1.0'
     '3.1.0-rc.1' = '3.1.0-rc.1'
     '0.0.0' = '0.0.0'
-    '1.2.3-alpha.1+build.5' = $null
 }
 foreach ($entry in $validCases.GetEnumerator()) {
     if ($entry.Value -eq $null) { continue }
