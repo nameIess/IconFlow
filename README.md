@@ -131,7 +131,7 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 
 ## Development and GitHub Actions 🧰
 
-The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**`, `feat/**`, and `fix/**`, and manual dispatch:
+The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**`, `feat/**`, and `fix/**`, and manual dispatch. The Docker workflow also runs on `v*` Git tags to validate and locally tag a release build:
 
 - **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
 - **Docker** — `.github/workflows/docker.yml`: validates Compose, builds both images with pull-enabled base tags, scans both images for fixable HIGH/CRITICAL vulnerabilities, starts the containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
