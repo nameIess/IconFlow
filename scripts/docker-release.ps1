@@ -7,13 +7,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# Docker tags cannot contain SemVer build metadata (+build).
-$semVerPattern = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?$'
-$Version = $Version.Trim()
-if ($Version.StartsWith('v')) { $Version = $Version.Substring(1) }
-if ($Version -notmatch $semVerPattern) {
-    throw "Invalid release version '$Version'. Use MAJOR.MINOR.PATCH with optional SemVer prerelease, e.g. 3.1.0 or 3.1.0-rc.1. Build metadata is not supported in Docker tags."
-}
+. (Join-Path $PSScriptRoot 'docker-release-version.ps1')
+$Version = ConvertTo-DockerReleaseTag -Version $Version
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot 'docker/compose.yaml'
