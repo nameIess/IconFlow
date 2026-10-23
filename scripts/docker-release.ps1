@@ -34,9 +34,11 @@ try {
 
     # Never overwrite a local release tag silently. Registry-wide checks require a configured registry.
     foreach ($imageName in $imageNames) {
-        & docker image inspect "$($imageName):$versionTag" *> $null
-        if ($LASTEXITCODE -eq 0) {
-            throw "Release tag $($imageName):$versionTag already exists locally. Choose a new version; existing release tags are not overwritten."
+        foreach ($tag in @($versionTag, $shaTag)) {
+            & docker image inspect "$($imageName):$tag" *> $null
+            if ($LASTEXITCODE -eq 0) {
+                throw "Release tag $($imageName):$tag already exists locally. Choose a new version or build from a new commit; existing release tags are not overwritten."
+            }
         }
     }
 
