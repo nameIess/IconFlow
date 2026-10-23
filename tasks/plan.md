@@ -17,7 +17,7 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [x] Inspect current Dockerfiles, Compose topology, ignore files, workflows, and scripts.
 - [x] Add/verify Dockerfile-specific context exclusions for the frontend and resolver; secrets and local dependency/build-output paths are excluded.
 - [x] Confirm the frontend uses npm ci with package-lock.json in a multi-stage build; resolver runtime uses the Node base image without installing npm dependencies.
-- [ ] Check base-image update policy; only pin digests after verifying the correct platform digests and documenting an update path.
+- [x] Document the current mutable-tag + --pull update policy; digest pinning remains deferred until correct multi-platform digests and an update path are verified.
 
 ### 2. Runtime and Compose hardening
 - [x] Compose config retains the non-root images, read-only filesystems, dropped capabilities, no-new-privileges, limits, health checks, and bounded logs.
@@ -26,13 +26,13 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [ ] Verify graceful startup, shutdown, and dependency health behavior.
 
 ### 3. CI build and integration validation
-- [ ] Validate Compose configuration in CI.
-- [ ] Build both images with updated base images (--pull) and deterministic lockfile installs.
-- [ ] Start the Compose stack and wait for health checks.
-- [ ] Smoke-test frontend content, health endpoint, and expected resolver API behavior.
-- [ ] Emit service logs on failure and always clean up containers, networks, and test volumes.
-- [ ] Keep Docker validation in the existing dedicated Docker workflow; avoid adding redundant workflows.
-- [ ] Pin third-party actions to reviewed full commit SHAs and document scan severity/blocking policy.
+- [x] Docker workflow validates Compose configuration before building.
+- [x] Docker workflow builds both images with --pull; frontend uses npm ci with the committed lockfile.
+- [x] Docker workflow starts the stack with --wait and a bounded timeout.
+- [x] Docker workflow smoke-tests frontend content, healthz, and an invalid resolver URL response.
+- [x] Docker workflow emits logs on failure and always runs Compose down with volume/orphan cleanup.
+- [x] Kept container validation in the existing dedicated Docker workflow.
+- [x] Third-party Actions use full commit SHAs; the HIGH/CRITICAL blocking policy and ignored-unfixed behavior are documented.
 
 ### 4. Source-driven image versioning
 - [x] Release script requires an explicit Docker-compatible SemVer version and no longer infers it from local Docker history.
@@ -59,8 +59,8 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 ### 7. Verification and delivery
 - [ ] Run available application tests, typecheck, and production build.
 - [ ] Run Compose config validation and Docker builds where a Docker daemon is available.
-- [ ] Validate workflow YAML and release-script behavior, including invalid versions and duplicate tags.
-- [ ] Review changes for secrets exposure, unnecessary scope, action pinning, and destructive cleanup.
+- [ ] Release-version test script is wired into CI; final verification remains pending because GitHub jobs fail before any step starts.
+- [ ] Final security/scope review pending; GitHub Actions jobs have not reached a runner.
 - [ ] Report passed checks, unrun checks, remaining risks, and exact branch/commit.
 
 ## Checkpoints
