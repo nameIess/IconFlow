@@ -27,7 +27,7 @@
 - [x] Apply a shared version tag to both images.
 - [x] Reject invalid versions and locally existing version tags; global duplicate detection requires a configured registry.
 - [x] Use :latest as the Compose default; CI explicitly sets IMAGE_TAG=ci and deployments can pin IMAGE_TAG=1.0.0.
-- [x] Release script now requires explicit SemVer, and PowerShell tests cover accepted/rejected version formats; execution is pending runner availability.
+- [x] Release script requires explicit SemVer; Node.js CI tests cover accepted/rejected versions cross-platform. PowerShell tests remain available for local Windows use.
 
 ## Registry publishing (gated)
 - [x] Set GHCR image namespace and workflow permissions; package visibility must be set in GitHub Packages.
@@ -44,8 +44,8 @@
 - [x] Documentation and task notes identify checks requiring GitHub Actions or a Docker-enabled host.
 
 ## Final verification
-- [ ] Not yet run: GitHub CI jobs failed before assigning a runner; local Node dependencies are not present in this workspace.
-- [ ] Not yet run: Docker CLI/daemon is unavailable in this workspace; GitHub Docker job also failed before its first step.
-- [ ] PowerShell edge-case tests are committed and wired into CI, but execution is blocked because GitHub jobs fail before steps start.
+- [ ] GitHub-hosted CI runs have failed before assigning a runner (runner_id=0, steps=[]); updated workflow runs are queued and must be inspected after GitHub assigns runners.
+- [x] User-provided Windows act log confirms Compose config and both image builds succeeded; smoke tests and vulnerability scans did not complete because Trivy setup lacked token. The hosted runner remains unverified.
+- [x] Cross-platform Node.js edge-case tests are wired into CI and passed locally in this workspace; hosted CI has not reached runner steps.
 - [ ] Final review remains pending until runner validation is available.
 - [x] Record passed/unrun checks and remaining risks in tasks/plan.md; runtime checks remain blocked by runner availability.
