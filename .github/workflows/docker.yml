@@ -145,15 +145,28 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           short_sha="${GITHUB_SHA:0:12}"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          for image in "ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver"; do
-            if docker manifest inspect "$image:$version" >/dev/null 2>&1; then
-              echo "Refusing to overwrite existing release tag $image:$version" >&2
-              exit 1
-            fi
-          done
           images=("ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver")
           for image in "${images[@]}"; do
-            docker push "$image:$version"
+            for tag in "$version" "sha-$short_sha"; do
+              if docker manifest inspect "$image:$tag" >/dev/null 2>&1; then
+                echo "Refusing to overwrite existing release tag $image:$tag" >&2
+                exit 1
+              fi
+            done
+          done
+          declare -A digests
+          for image in "${images[@]}"; do
+            push_output="$(docker push "$image:$version" 2>&1)" || {
+              printf '%s\n' "$push_output" >&2
+              exit 1
+            }
+            printf '%s\n' "$push_output"
+            digest="$(printf '%s\n' "$push_output" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
+            if [[ -z "$digest" ]]; then
+              echo "Could not extract the pushed digest for $image:$version" >&2
+              exit 1
+            fi
+            digests["$image"]="$digest"
             docker push "$image:sha-$short_sha"
           done
           if [[ "$version" != *-* ]]; then
@@ -172,8 +185,7 @@ jobs:
           {
             echo "## Published IconFlow Docker release $version"
             for image in "${images[@]}"; do
-              digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "$image:$version" | sed 's/.*@//')"
-              echo "- `$image:$version` — `$image@$digest`"
+              echo "- `$image:$version` — `$image@${digests[$image]}`"
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
