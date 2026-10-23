@@ -1,6 +1,6 @@
 # Local Docker image releases
 
-Use the PowerShell release script from any working directory:
+Run the PowerShell release script from the repository root:
 
 ```powershell
 .\scripts\docker-release.ps1
