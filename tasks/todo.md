@@ -30,12 +30,12 @@
 - [x] Release script now requires explicit SemVer, and PowerShell tests cover accepted/rejected version formats; execution is pending runner availability.
 
 ## Registry publishing (gated)
-- [ ] Confirm registry, namespace, visibility, and permissions.
-- [ ] Add least-privilege authentication without embedding secrets.
-- [ ] Restrict publishing to trusted release events.
-- [ ] Publish only artifacts that passed validation.
-- [ ] Record image digests and rollback references.
-- [ ] Add SBOM and provenance where supported.
+- [x] Set GHCR image namespace and workflow permissions; package visibility must be set in GitHub Packages.
+- [x] Use job-scoped packages:write and GITHUB_TOKEN login without build args or embedded credentials.
+- [x] Publish only on validated v* tag pushes after all Docker checks pass.
+- [x] Push the same image IDs built, scanned, health-checked, and smoke-tested.
+- [ ] Capture published image digests in workflow output/release notes.
+- [ ] Add SBOM/provenance after release publishing is verified.
 
 ## Documentation
 - [x] Document build, health, smoke-test, logs, cleanup, and troubleshooting commands.
