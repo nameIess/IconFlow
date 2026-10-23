@@ -117,6 +117,7 @@ The GitHub Actions workflows are split into two responsibilities. Both run on pu
 - **Docker** — `.github/workflows/docker.yml`: validates Compose, builds both images with pull-enabled base tags, scans both images for fixable HIGH/CRITICAL vulnerabilities, starts the containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
 
 Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
+
 ## Contributing 🤝
 
 1. Create a focused branch for your change.
