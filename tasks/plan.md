@@ -39,7 +39,7 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [x] Release script creates commit-SHA tags and stable version tags for both images.
 - [x] Release script applies one explicit version to both image names while preserving separate images.
 - [x] Release script validates version syntax and refuses to overwrite existing local version tags; global duplicate checks are reserved for future registry publishing.
-- [x] Compose keeps :ci; :latest is opt-in via -UpdateLatest and documented as mutable.
+- [x] Compose defaults to `:latest` for normal pulls/runs; CI sets `IMAGE_TAG=ci` explicitly for isolated test builds.
 - [x] Explicit versions remove dependence on local image history; old tags are never automatically deleted.
 
 ### 5. Registry publishing (gated)
@@ -47,19 +47,20 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [x] Release job uses the ephemeral `GITHUB_TOKEN` with job-scoped `packages: write`; credentials are piped to `docker login` and not passed to builds.
 - [x] Publishing runs only for pushed `v*` Git tags after build, scan, health, and smoke-test steps pass.
 - [x] The exact tested local image IDs are tagged and pushed after the validation gates in the same runner.
-- [ ] Workflow tags releases with SemVer and commit SHA; recording pushed digests as release artifacts remains to be added.
+- [x] Workflow pushes SemVer and commit-SHA tags, plus stable major/minor/latest aliases; pushed version image digests are written to the Actions summary.
 - [ ] SBOM and provenance/attestations remain to be added after publication behavior is verified.
 
 ### 6. Documentation
 - [x] Documented local build, health, smoke-test, logs, cleanup, tagging, and troubleshooting commands.
 - [x] Documented SemVer/commit tags, mutable :latest, and digest-based deployment/rollback.
 - [x] GHCR publishing is configured with job-scoped permissions; package visibility remains a repository-owner setting.
-- [x] Documentation distinguishes implemented local behavior from registry publishing, which remains disabled.
+- [x] Documentation explains local development, GHCR release publishing, immutable versions, mutable `latest`, and digest-based rollout.
 
 ### 7. Verification and delivery
 - [ ] Run available application tests, typecheck, and production build.
 - [ ] Run Compose config validation and Docker builds where a Docker daemon is available.
-- [ ] Release-version test script is wired into CI; final verification remains pending because GitHub jobs fail before any step starts.
+- [x] Release-version validation now runs with Node.js in CI, avoiding a PowerShell-only runner dependency; Node edge-case tests passed in the available local environment.
+- [ ] Hosted validation remains pending because GitHub Actions currently fails before assigning runners; the submitted log also shows local `act` needs a token for the Trivy helper checkout.
 - [ ] Final security/scope review pending; GitHub Actions jobs have not reached a runner.
 - [x] Record passed/unrun checks, known risks, and current branch/commit in the verification status above.
 
@@ -68,9 +69,9 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - Compose now uses `ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}` and `ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}`; CI sets `IMAGE_TAG=ci`.
 - The Docker workflow is configured to publish the same tested images to GHCR only for validated `v*` tags whose commit is reachable from `master`. Stable releases publish SemVer, major/minor aliases, SHA, and `latest`; prereleases do not move `latest`. Existing version tags are checked before pushing. Pushed version digests are added to the Actions step summary.
 - First release convention documented as `v1.0.0`; the Git tag is the version source of truth. The workflow does not automatically invent or increment SemVer numbers.
-- Release-version regex cases were checked independently and the PowerShell tests are wired into CI, but they have not executed.
-- GitHub Actions runs fail before any workflow step starts: the latest inspected jobs have no steps and no runner assigned. Latest inspected runs: [CI](https://github.com/nameIess/IconFlow/actions/runs/40002926093) and [Docker](https://github.com/nameIess/IconFlow/actions/runs/40002925991).
-- This workspace has no checkout of the application repository, Docker CLI/daemon, or PowerShell runtime. Application tests, typecheck, production build, Compose validation, image builds, vulnerability scans, registry publishing, and runtime smoke tests remain unverified.
+- Cross-platform Node.js release-version regex tests were run locally and passed; PowerShell tests remain for Windows/local use.
+- GitHub Actions runs previously failed before any workflow step started (`runner_id=0`, `steps=[]`). New runs have been triggered by the workflow fixes; confirm those queued runs start and report results. Earlier failure samples: [CI](https://github.com/nameIess/IconFlow/actions/runs/40002926093) and [Docker](https://github.com/nameIess/IconFlow/actions/runs/40002925991).
+- This agent workspace has no checkout of the application repository, Docker CLI/daemon, or PowerShell runtime. User-supplied `act` output confirms Compose validation and both image builds succeed; scans failed at helper checkout due to missing token and smoke tests did not run. Application tests/typecheck/build and hosted runtime verification remain pending.
 - GHCR package visibility still must be configured appropriately in GitHub Packages. No actual `v1.0.0` tag has been pushed and no production image has been published from this branch.
 - Base-image digests remain unpinned intentionally. The current versioned tags are refreshed with `--pull`; digest pinning awaits verified multi-platform digests and a documented update process.
 - SBOM/provenance publication remains follow-up hardening.
