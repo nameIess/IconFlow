@@ -26,7 +26,7 @@
 - [x] Add shared commit-SHA tags for both images.
 - [x] Apply a shared version tag to both images.
 - [x] Reject invalid versions and locally existing version tags; global duplicate detection requires a configured registry.
-- [x] Keep :ci for builds; make :latest an explicit opt-in.
+- [x] Use :latest as the Compose default; CI explicitly sets IMAGE_TAG=ci and deployments can pin IMAGE_TAG=1.0.0.
 - [x] Release script now requires explicit SemVer, and PowerShell tests cover accepted/rejected version formats; execution is pending runner availability.
 
 ## Registry publishing (gated)
@@ -40,7 +40,7 @@
 ## Documentation
 - [x] Document build, health, smoke-test, logs, cleanup, and troubleshooting commands.
 - [x] Explain version tags, commit tags, mutable :latest, and digest-based rollback.
-- [x] Leave registry setup/publishing disabled until target and permissions are confirmed.
+- [x] Configure GHCR release publishing on validated v* tags; package visibility must be configured in GitHub Packages.
 - [x] Documentation and task notes identify checks requiring GitHub Actions or a Docker-enabled host.
 
 ## Final verification
