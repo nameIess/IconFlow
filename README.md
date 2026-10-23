@@ -60,7 +60,7 @@ docker compose -f docker/compose.yaml logs -f
 docker compose -f docker/compose.yaml down
 ```
 
-The first build needs network access to download base images and npm packages. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
+The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
 ## API keys 🔑
 
@@ -114,7 +114,7 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch:
 
 - **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
-- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds and starts the containers, and smoke-tests the frontend and resolver.
+- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds both images with pull-enabled base tags, scans both images for fixable HIGH/CRITICAL vulnerabilities, starts the containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
 
 Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
 ## Contributing 🤝
