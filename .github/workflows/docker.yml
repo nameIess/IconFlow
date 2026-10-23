@@ -20,6 +20,8 @@ on:
       - 'feature/**'
       - 'feat/**'
       - 'fix/**'
+    tags:
+      - 'v*'
 
   workflow_dispatch:
 
@@ -53,6 +55,64 @@ jobs:
 
       - name: Build images
         run: docker compose -f docker/compose.yaml build --pull
+
+      - name: Tag images for a Git release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?      - name: Scan frontend image for fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: iconflow-web:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan resolver image for fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: iconflow-resolver:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Start containers and wait for health
+        run: docker compose -f docker/compose.yaml up --detach --no-build --wait --wait-timeout 90
+
+      - name: Smoke-test frontend and resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error http://127.0.0.1:8080/ -o /tmp/iconflow-index.html
+          grep -q '<div id="root">' /tmp/iconflow-index.html
+          curl --fail --silent --show-error http://127.0.0.1:8080/healthz -o /dev/null
+          status="$(curl --silent --show-error --output /tmp/iconflow-api.json --write-out '%{http_code}' \
+            --get --data-urlencode 'url=https://example.com/' \
+            http://127.0.0.1:8080/api/resolve-icon)"
+          test "$status" = "400"
+          grep -q 'Only macOSicons HTTPS share URLs are supported' /tmp/iconflow-api.json
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f docker/compose.yaml logs --no-color
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f docker/compose.yaml down --volumes --remove-orphans
+
+          if [[ ! "$version" =~ $semver ]]; then
+            echo "Invalid release tag '$GITHUB_REF_NAME'. Expected vMAJOR.MINOR.PATCH with optional prerelease and no build metadata." >&2
+            exit 1
+          fi
+          short_sha="${GITHUB_SHA:0:12}"
+          for image in iconflow-web iconflow-resolver; do
+            docker image tag "$image:ci" "$image:$version"
+            docker image tag "$image:ci" "$image:sha-$short_sha"
+          done
 
       - name: Scan frontend image for fixable high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
