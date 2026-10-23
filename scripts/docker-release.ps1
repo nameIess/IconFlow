@@ -12,7 +12,7 @@ $Version = ConvertTo-DockerReleaseTag -Version $Version
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot 'docker/compose.yaml'
-$imageNames = @('iconflow-web', 'iconflow-resolver')
+$imageNames = @('ghcr.io/nameiess/iconflow-web', 'ghcr.io/nameiess/iconflow-resolver')
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker CLI was not found. Install/start Docker Desktop and try again.' }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'Git CLI was not found. Install Git and try again.' }
 if (-not (Test-Path -LiteralPath $composeFile -PathType Leaf)) { throw "Compose file not found: $composeFile" }
@@ -37,6 +37,8 @@ try {
         }
     }
 
+    $previousImageTag = $env:IMAGE_TAG
+    $env:IMAGE_TAG = 'ci'
     Write-Host 'Validating Compose configuration...'
     & docker compose -f $composeFile config --quiet
     if ($LASTEXITCODE -ne 0) { throw 'Docker Compose configuration validation failed.' }
@@ -69,4 +71,8 @@ try {
     if ($UpdateLatest) { Write-Host ':latest was updated (mutable convenience tag; do not use it as a rollback reference).' }
     Write-Host 'No images were pushed. This script only tags local images; it does not guarantee registry-wide uniqueness.'
 }
-finally { Pop-Location }
+finally {
+    if ($null -eq $previousImageTag) { Remove-Item Env:IMAGE_TAG -ErrorAction SilentlyContinue }
+    else { $env:IMAGE_TAG = $previousImageTag }
+    Pop-Location
+}
