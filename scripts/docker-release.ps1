@@ -18,6 +18,7 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'Git CLI was n
 if (-not (Test-Path -LiteralPath $composeFile -PathType Leaf)) { throw "Compose file not found: $composeFile" }
 
 Push-Location $repoRoot
+$previousImageTag = $env:IMAGE_TAG
 try {
     $commitSha = (& git rev-parse --verify HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $commitSha -notmatch '^[0-9a-f]{40}$') {
@@ -37,7 +38,6 @@ try {
         }
     }
 
-    $previousImageTag = $env:IMAGE_TAG
     $env:IMAGE_TAG = 'ci'
     Write-Host 'Validating Compose configuration...'
     & docker compose -f $composeFile config --quiet
