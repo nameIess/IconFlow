@@ -1,5 +1,6 @@
 services:
   web:
+    image: iconflow-web:ci
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -32,6 +33,7 @@ services:
         max-file: "3"
 
   resolver:
+    image: iconflow-resolver:ci
     build:
       context: ..
       dockerfile: docker/resolver/Dockerfile
