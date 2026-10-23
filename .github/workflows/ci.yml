@@ -56,8 +56,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Validate Docker release version rules
-        shell: pwsh
-        run: ./scripts/test-docker-release-version.ps1
+        run: node scripts/test-docker-release-version.mjs
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
