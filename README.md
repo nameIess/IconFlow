@@ -24,7 +24,7 @@ npm ci
 npm run dev
 ```
 
-Run the checks used for production builds with:
+Run the checks locally with:
 
 ```bash
 npm test
@@ -109,11 +109,15 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 - Content Security Policy and security headers are configured for both Vercel and the Docker web server.
 - Docker's resolver is not published to the host; the local web port binds to loopback.
 
-## Development 🧰
+## Development and GitHub Actions 🧰
 
-Node.js 24 is used in CI (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
+The GitHub Actions workflows are separated by responsibility. All three run on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch:
 
-CI runs `npm ci --no-audit --no-fund`, `npm test`, the typecheck, production build, and `npm audit --audit-level=high`. It also validates the Compose configuration, builds both containers, starts them, and smoke-tests the frontend and resolver. The workflow runs on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch.
+- **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, and `npm audit --audit-level=high`. CI means *Continuous Integration*: automated checks on changes to catch regressions early.
+- **App build** — `.github/workflows/build.yml`: runs `npm run build` and uploads the generated `dist/` directory as the `iconflow-dist` artifact for seven days.
+- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds and starts the containers, and smoke-tests the frontend and resolver.
+
+Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
 
 ## Contributing 🤝
 
