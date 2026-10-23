@@ -111,14 +111,12 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 
 ## Development and GitHub Actions 🧰
 
-The GitHub Actions workflows are separated by responsibility. All three run on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch:
+The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch:
 
-- **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, and `npm audit --audit-level=high`. CI means *Continuous Integration*: automated checks on changes to catch regressions early.
-- **App build** — `.github/workflows/build.yml`: runs `npm run build` and uploads the generated `dist/` directory as the `iconflow-dist` artifact for seven days.
+- **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
 - **Docker** — `.github/workflows/docker.yml`: validates Compose, builds and starts the containers, and smoke-tests the frontend and resolver.
 
 Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
-
 ## Contributing 🤝
 
 1. Create a focused branch for your change.
