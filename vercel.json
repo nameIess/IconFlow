@@ -1,6 +1,5 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm test && npm run typecheck && npm run build && npm audit --audit-level=high",
+"buildCommand": "npm test && npm run typecheck && npm run build && npm audit --audit-level=high",
   "headers": [
     {
       "source": "/(.*)",

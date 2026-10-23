@@ -34,7 +34,7 @@ npm run build
 
 ## Docker 🐳
 
-Docker configuration lives in `docker/`. Docker Compose builds the static frontend and the API resolver as separate containers. Only the frontend is published to the host; the resolver is reachable only through the Compose network.
+Docker configuration lives in `docker/`. One GHCR image contains the static frontend and API resolver runtime; Compose starts it twice as isolated web and resolver containers. Only the frontend is published to the host; the resolver is reachable only through the Compose network.
 
 ### Prerequisites
 
@@ -45,7 +45,7 @@ Docker configuration lives in `docker/`. Docker Compose builds the static fronte
 Run these commands from the repository root:
 
 ```bash
-docker compose -f docker/compose.yaml up --build -d
+docker compose -f docker/compose.yaml up --build --detach --wait
 docker compose -f docker/compose.yaml ps
 ```
 
@@ -68,11 +68,10 @@ The resolver smoke test should return HTTP 400 for `https://example.com/`, becau
 
 ### Production image tags and releases
 
-Compose uses the production GHCR image names and defaults to `:latest`:
+Compose uses one production GHCR image and defaults to `:latest`:
 
 ```yaml
-image: ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}
-image: ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}
+image: ghcr.io/nameiess/iconflow:${IMAGE_TAG:-latest}
 ```
 
 For local development, `docker compose -f docker/compose.yaml up --build -d` builds the current source and tags it `:latest`. To run a published release, pull and start the chosen tag:
@@ -80,11 +79,11 @@ For local development, `docker compose -f docker/compose.yaml up --build -d` bui
 ```bash
 # Convenient rolling deployment (moves when latest is republished)
 docker compose -f docker/compose.yaml pull
-docker compose -f docker/compose.yaml up -d
+docker compose -f docker/compose.yaml up --detach --wait
 
 # Reproducible deployment pinned to the first release
 IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml pull
-IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml up -d
+IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml up --detach --wait
 ```
 
 The release workflow is driven by a Git tag, not by local Docker history. For the first release, push `v1.0.0` after the code is ready:
@@ -94,11 +93,11 @@ git tag -a v1.0.0 -m "IconFlow Docker release 1.0.0"
 git push origin v1.0.0
 ```
 
-That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish both images to GHCR with `1.0.0` and `sha-<12-character-commit>` tags. For stable releases it also moves `1.0`, `1`, and `latest` to the new image. Prereleases such as `v1.1.0-rc.1` receive only their version and SHA tags, never `:latest`. Existing version tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
+That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish one image to GHCR with `1.0.0` and `sha-<12-character-commit>` tags. For stable releases it also moves `1.0`, `1`, and `latest` to the new image. Prereleases such as `v1.1.0-rc.1` receive only their version and SHA tags, never `:latest`. Existing version tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
 
 For production rollouts, prefer `IMAGE_TAG=1.0.0` (or a digest) to keep deployments reproducible. The default `:latest` is a convenience pointer and can change when a new stable release passes all gates. See [scripts/README.md](scripts/README.md) for local tagging and troubleshooting.
 
-The base images currently use versioned tags (`node:24-alpine` and `nginxinc/nginx-unprivileged:1.29-alpine`) and CI/release builds use `--pull`. These tags are mutable, so rebuilding later can select newer base layers; this is an explicit update policy, not byte-for-byte reproducibility. Digest pinning is deferred until the correct multi-platform digests and a regular digest-update process are verified. The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
+The combined image currently uses the versioned `node:24-alpine` base and installs Alpine's Nginx package; CI/release builds use `--pull`. These inputs are mutable, so rebuilding later can select newer base layers; this is an explicit update policy, not byte-for-byte reproducibility. Digest pinning is deferred until the correct multi-platform digests and a regular digest-update process are verified. The first build needs network access to download the base image, Alpine packages, and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
 ## API keys 🔑
 
@@ -152,7 +151,7 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**`, `feat/**`, and `fix/**`, and manual dispatch. The Docker workflow also runs on `v*` Git tags to validate and publish a production release to GHCR:
 
 - **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
-- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds both images with pull-enabled base tags, scans both images for fixable HIGH/CRITICAL vulnerabilities, starts the containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
+- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds one image with pull-enabled base tags, scans it for fixable HIGH/CRITICAL vulnerabilities, starts both containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
 
 Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
 

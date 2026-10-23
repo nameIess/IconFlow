@@ -85,38 +85,24 @@ jobs:
           fi
           short_sha="$(printf '%s' "$GITHUB_SHA" | cut -c1-12)"
           owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
-          for image in "ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver"; do
-            docker image tag "$image:ci" "$image:$version"
-            docker image tag "$image:ci" "$image:sha-$short_sha"
-          done
+          image="ghcr.io/$owner/iconflow"
+          docker image tag "$image:ci" "$image:$version"
+          docker image tag "$image:ci" "$image:sha-$short_sha"
           if [[ "$version" != *-* ]]; then
-            for image in "ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver"; do
-              major="${version%%.*}"
-              rest="${version#*.}"
-              minor="${rest%%.*}"
-              docker image tag "$image:ci" "$image:$major"
-              docker image tag "$image:ci" "$image:$major.$minor"
-              docker image tag "$image:ci" "$image:latest"
-            done
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            docker image tag "$image:ci" "$image:$major"
+            docker image tag "$image:ci" "$image:$major.$minor"
+            docker image tag "$image:ci" "$image:latest"
           fi
 
-      - name: Scan frontend image for fixable high and critical vulnerabilities
+      - name: Scan IconFlow image for fixable high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          image-ref: ghcr.io/nameiess/iconflow-web:ci
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-
-      - name: Scan resolver image for fixable high and critical vulnerabilities
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          image-ref: ghcr.io/nameiess/iconflow-resolver:ci
+          image-ref: ghcr.io/nameiess/iconflow:ci
           format: table
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -149,48 +135,35 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           short_sha="${GITHUB_SHA:0:12}"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          images=("ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver")
-          for image in "${images[@]}"; do
-            for tag in "$version" "sha-$short_sha"; do
-              if docker manifest inspect "$image:$tag" >/dev/null 2>&1; then
-                echo "Refusing to overwrite existing release tag $image:$tag" >&2
-                exit 1
-              fi
-            done
-          done
-          declare -A digests
-          for image in "${images[@]}"; do
-            push_output="$(docker push "$image:$version" 2>&1)" || {
-              printf '%s\n' "$push_output" >&2
-              exit 1
-            }
-            printf '%s\n' "$push_output"
-            digest="$(printf '%s\n' "$push_output" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
-            if [[ -z "$digest" ]]; then
-              echo "Could not extract the pushed digest for $image:$version" >&2
+          image="ghcr.io/$owner/iconflow"
+          for tag in "$version" "sha-$short_sha"; do
+            if docker manifest inspect "$image:$tag" >/dev/null 2>&1; then
+              echo "Refusing to overwrite existing release tag $image:$tag" >&2
               exit 1
             fi
-            digests["$image"]="$digest"
-            docker push "$image:sha-$short_sha"
           done
+          push_output="$(docker push "$image:$version" 2>&1)" || {
+            printf '%s\n' "$push_output" >&2
+            exit 1
+          }
+          printf '%s\n' "$push_output"
+          digest="$(printf '%s\n' "$push_output" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
+          if [[ -z "$digest" ]]; then
+            echo "Could not extract the pushed digest for $image:$version" >&2
+            exit 1
+          fi
+          docker push "$image:sha-$short_sha"
           if [[ "$version" != *-* ]]; then
             major="${version%%.*}"
             rest="${version#*.}"
             minor="${rest%%.*}"
-            for image in "${images[@]}"; do
-              docker push "$image:$major.$minor"
-              docker push "$image:$major"
-            done
-            # Move latest only after both images and all stable aliases have been pushed.
-            for image in "${images[@]}"; do
-              docker push "$image:latest"
-            done
+            docker push "$image:$major.$minor"
+            docker push "$image:$major"
+            docker push "$image:latest"
           fi
           {
             echo "## Published IconFlow Docker release $version"
-            for image in "${images[@]}"; do
-              echo "- `$image:$version` — `$image@${digests[$image]}`"
-            done
+            echo "- `$image:$version` — `$image@$digest`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show container logs on failure

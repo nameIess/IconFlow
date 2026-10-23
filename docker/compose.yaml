@@ -2,10 +2,12 @@ name: iconflow
 
 services:
   web:
-    image: ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/nameiess/iconflow:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    command: ["nginx", "-g", "daemon off;"]
+    user: nginx
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -14,6 +16,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
+      - /var/lib/nginx:rw,noexec,nosuid,size=8m
     cap_drop:
       - ALL
     security_opt:
@@ -35,10 +38,9 @@ services:
         max-file: "3"
 
   resolver:
-    image: ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}
-    build:
-      context: ..
-      dockerfile: docker/resolver/Dockerfile
+    image: ghcr.io/nameiess/iconflow:${IMAGE_TAG:-latest}
+    command: ["node", "docker/resolver/server.mjs"]
+    user: node
     expose:
       - "3000"
     read_only: true

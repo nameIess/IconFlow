@@ -12,7 +12,7 @@ $Version = ConvertTo-DockerReleaseTag -Version $Version
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $composeFile = Join-Path $repoRoot 'docker/compose.yaml'
-$imageNames = @('ghcr.io/nameiess/iconflow-web', 'ghcr.io/nameiess/iconflow-resolver')
+$imageName = 'ghcr.io/nameiess/iconflow'
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker CLI was not found. Install/start Docker Desktop and try again.' }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'Git CLI was not found. Install Git and try again.' }
 if (-not (Test-Path -LiteralPath $composeFile -PathType Leaf)) { throw "Compose file not found: $composeFile" }
@@ -29,12 +29,10 @@ try {
     $shaTag = "sha-$shortSha"
 
     # Never overwrite a local release tag silently. Registry-wide checks require a configured registry.
-    foreach ($imageName in $imageNames) {
-        foreach ($tag in @($versionTag, $shaTag)) {
-            & docker image inspect "$($imageName):$tag" *> $null
-            if ($LASTEXITCODE -eq 0) {
-                throw "Release tag $($imageName):$tag already exists locally. Choose a new version or build from a new commit; existing release tags are not overwritten."
-            }
+    foreach ($tag in @($versionTag, $shaTag)) {
+        & docker image inspect "$($imageName):$tag" *> $null
+        if ($LASTEXITCODE -eq 0) {
+            throw "Release tag $($imageName):$tag already exists locally. Choose a new version or build from a new commit; existing release tags are not overwritten."
         }
     }
 
@@ -47,27 +45,21 @@ try {
     & docker compose -f $composeFile build --pull
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose build failed with exit code $LASTEXITCODE." }
 
-    foreach ($imageName in $imageNames) {
-        & docker image inspect "$($imageName):ci" *> $null
-        if ($LASTEXITCODE -ne 0) { throw "Expected image $($imageName):ci was not produced by the Compose build." }
-    }
+    & docker image inspect "$($imageName):ci" *> $null
+    if ($LASTEXITCODE -ne 0) { throw "Expected image $($imageName):ci was not produced by the Compose build." }
 
-    foreach ($imageName in $imageNames) {
-        foreach ($tag in @($versionTag, $shaTag)) {
-            & docker image tag "$($imageName):ci" "$($imageName):$tag"
-            if ($LASTEXITCODE -ne 0) { throw "Failed to tag $($imageName):$tag." }
-        }
-        if ($UpdateLatest) {
-            & docker image tag "$($imageName):ci" "$($imageName):latest"
-            if ($LASTEXITCODE -ne 0) { throw "Failed to update $($imageName):latest." }
-        }
+    foreach ($tag in @($versionTag, $shaTag)) {
+        & docker image tag "$($imageName):ci" "$($imageName):$tag"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to tag $($imageName):$tag." }
+    }
+    if ($UpdateLatest) {
+        & docker image tag "$($imageName):ci" "$($imageName):latest"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to update $($imageName):latest." }
     }
 
     Write-Host "Created local release tags for version $Version at commit $shortSha."
-    foreach ($imageName in $imageNames) {
-        & docker image ls $imageName
-        if ($LASTEXITCODE -ne 0) { throw "Could not display tags for $imageName." }
-    }
+    & docker image ls $imageName
+    if ($LASTEXITCODE -ne 0) { throw "Could not display tags for $imageName." }
     if ($UpdateLatest) { Write-Host ':latest was updated (mutable convenience tag; do not use it as a rollback reference).' }
     Write-Host 'No images were pushed. This script only tags local images; it does not guarantee registry-wide uniqueness.'
 }

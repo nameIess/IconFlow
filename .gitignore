@@ -23,6 +23,8 @@ docker/.env.*
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+docs/
+tasks/
 
 # TypeScript build cache
 *.tsbuildinfo
