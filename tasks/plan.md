@@ -53,7 +53,7 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 ### 6. Documentation
 - [x] Documented local build, health, smoke-test, logs, cleanup, tagging, and troubleshooting commands.
 - [x] Documented SemVer/commit tags, mutable :latest, and digest-based deployment/rollback.
-- [x] No registry secrets or publishing settings added while registry choice remains unconfirmed.
+- [x] GHCR publishing is configured with job-scoped permissions; package visibility remains a repository-owner setting.
 - [x] Documentation distinguishes implemented local behavior from registry publishing, which remains disabled.
 
 ### 7. Verification and delivery
@@ -65,12 +65,15 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 
 ## Verification status (2026-10-23)
 
-- Repository files and workflow definitions were reviewed through the GitHub repository connection.
-- The release-version regex cases were checked independently: valid versions `3.1.0`, `v3.1.0`, `3.1.0-rc.1`, and `0.0.0` match; invalid/unsupported inputs including empty, `01.2.3`, `1.2.3+build`, `1.2.3-01`, and malformed prerelease strings do not. The PowerShell test script is committed and wired into CI, but it has not executed.
-- GitHub Actions runs for the branch fail before any workflow step starts; the reported jobs have no steps and no runner assigned. Latest inspected run links: [CI](https://github.com/nameIess/IconFlow/actions/runs/39928394513) and [Docker](https://github.com/nameIess/IconFlow/actions/runs/39928394495).
-- This workspace has no checkout of the application repository, Docker CLI/daemon, or PowerShell runtime. Therefore application tests, typecheck, production build, Compose validation, image builds, vulnerability scans, and runtime smoke tests remain unverified.
-- Registry publishing remains disabled because the target registry, namespace, package visibility, and publishing permissions have not been confirmed.
+- Compose now uses `ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}` and `ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}`; CI sets `IMAGE_TAG=ci`.
+- The Docker workflow is configured to publish the same tested images to GHCR only for validated `v*` tags whose commit is reachable from `master`. Stable releases publish SemVer, major/minor aliases, SHA, and `latest`; prereleases do not move `latest`. Existing version tags are checked before pushing. Pushed version digests are added to the Actions step summary.
+- First release convention documented as `v1.0.0`; the Git tag is the version source of truth. The workflow does not automatically invent or increment SemVer numbers.
+- Release-version regex cases were checked independently and the PowerShell tests are wired into CI, but they have not executed.
+- GitHub Actions runs fail before any workflow step starts: the latest inspected jobs have no steps and no runner assigned. Latest inspected runs: [CI](https://github.com/nameIess/IconFlow/actions/runs/40002763746) and [Docker](https://github.com/nameIess/IconFlow/actions/runs/40002763712).
+- This workspace has no checkout of the application repository, Docker CLI/daemon, or PowerShell runtime. Application tests, typecheck, production build, Compose validation, image builds, vulnerability scans, registry publishing, and runtime smoke tests remain unverified.
+- GHCR package visibility still must be configured appropriately in GitHub Packages. No actual `v1.0.0` tag has been pushed and no production image has been published from this branch.
 - Base-image digests remain unpinned intentionally. The current versioned tags are refreshed with `--pull`; digest pinning awaits verified multi-platform digests and a documented update process.
+- SBOM/provenance publication remains follow-up hardening.
 
 ## Checkpoints
 1. Architecture and build contexts are preserved; no publishing enabled yet.
