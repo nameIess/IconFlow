@@ -77,10 +77,10 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - SBOM/provenance publication remains follow-up hardening.
 
 ## Checkpoints
-1. Architecture and build contexts are preserved; no publishing enabled yet.
+1. Architecture and build contexts are preserved; production publishing is gated to validated Git release tags.
 2. Compose hardening and CI smoke tests pass.
 3. Version tags are derived from a trusted source and both images stay in sync.
-4. Registry publishing remains disabled until registry and access policy are verified.
+4. Registry publishing is configured but only triggers on a SemVer `v*` tag pointing at a commit reachable from `master`; GHCR package visibility remains owner-configured.
 5. Documentation and verification report match the actual implementation.
 
 ## Out of scope
