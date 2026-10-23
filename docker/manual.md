@@ -59,7 +59,7 @@ git --version
 Go to the repository root. Adjust the path if your checkout is somewhere else:
 
 ```powershell
-cd D:\\NeoSparkVibe\\IconFlow
+cd D:\NeoSparkVibe\IconFlow
 ```
 
 The first local build requires network access to download the Node.js base image and install npm dependencies. A published-image run requires access to GHCR; private packages also require authentication.
