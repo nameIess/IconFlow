@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { resolveMacosiconsShareUrl } from "../../api/resolve-icon.ts";
 
-const MAX_REQUEST_TARGET_LENGTH = 8 * 1024;
+const MAX_REQUEST_TARGET_LENGTH = 4 * 1024;
 
 function sendJson(res, status, body) {
   res.statusCode = status;

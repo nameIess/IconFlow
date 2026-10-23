@@ -42,6 +42,6 @@ test("resolver rejects URLs outside the allow-list without fetching them", async
 });
 
 test("oversized request targets are rejected", async () => {
-  const response = await fetch(`${origin}/api/resolve-icon?url=${"a".repeat(9000)}`);
+  const response = await fetch(`${origin}/api/resolve-icon?url=${"a".repeat(5000)}`);
   assert.equal(response.status, 414);
 });
