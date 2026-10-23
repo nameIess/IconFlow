@@ -2,21 +2,21 @@
 
 Run the PowerShell release script from the repository root with an explicit version:
 
-    .\scripts\docker-release.ps1 -Version 3.1.0
+    .\scripts\docker-release.ps1 -Version 1.0.0
 
-The script accepts Docker-compatible SemVer versions (MAJOR.MINOR.PATCH with an optional prerelease such as 3.1.0-rc.1). An optional leading "v" is accepted. SemVer build metadata (+build) is not supported because Docker tags do not allow the plus sign.
+The script accepts Docker-compatible SemVer versions (MAJOR.MINOR.PATCH with an optional prerelease such as 1.0.0-rc.1). An optional leading "v" is accepted. SemVer build metadata (+build) is not supported because Docker tags do not allow the plus sign.
 
 For each service it creates two local tags:
-- `ghcr.io/nameiess/iconflow-web:3.1.0` and `ghcr.io/nameiess/iconflow-resolver:3.1.0`
+- `ghcr.io/nameiess/iconflow-web:1.0.0` and `ghcr.io/nameiess/iconflow-resolver:1.0.0`
 - `ghcr.io/nameiess/iconflow-web:sha-<12-character-commit>` and `ghcr.io/nameiess/iconflow-resolver:sha-<12-character-commit>`
 
 The same version and source commit are used for both images, while each image remains independently built and has its own image ID/digest. The GitHub Docker release workflow publishes the tested images to GHCR on a validated `v*` Git tag, and advances `latest` only for stable releases after build, scan, health, and smoke-test gates pass. The script validates Compose, builds both images with --pull, and only tags them after both build outputs exist. It does not inspect local history to guess the next version, delete older images, create Git tags/commits, or push to a registry. Production publishing is handled separately by `.github/workflows/docker.yml` on a validated `v*` Git tag.
 
 The version tag is never overwritten if it already exists locally. This local guard is not a global registry duplicate check. The release workflow performs a registry-side check for an existing version tag before publishing.
 
-:ci is the stable local Compose build tag. :latest is mutable and not created/changed by default. To also update it deliberately:
+The CI workflow explicitly sets `IMAGE_TAG=ci`; normal local Compose runs default to `latest`. The local release helper creates a version tag and SHA tag; `:latest` is mutable and is only changed by the helper when `-UpdateLatest` is supplied.
 
-    .\scripts\docker-release.ps1 -Version 3.1.0 -UpdateLatest
+    .\scripts\docker-release.ps1 -Version 1.0.0 -UpdateLatest
 
 Use the immutable version tag or a digest for deployment/rollback, not :latest. For a production release, create and protect a Git release tag such as `v1.0.0`; the Docker workflow validates it, tests the images, then publishes version/SHA tags and advances stable aliases including `latest`.
 
