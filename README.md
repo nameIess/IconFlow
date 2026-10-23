@@ -53,12 +53,30 @@ Open [http://localhost:8080](http://localhost:8080).
 
 The port is bound to `127.0.0.1` so the app is not exposed to other machines by default. The containers run as non-root users, drop Linux capabilities, enable `no-new-privileges`, use read-only root filesystems with temporary writable mounts, and have resource limits and health checks.
 
-### Logs and shutdown
+### Health, smoke test, logs, and shutdown
 
 ```bash
+docker compose -f docker/compose.yaml ps
+curl --fail http://127.0.0.1:8080/
+curl --fail http://127.0.0.1:8080/healthz
+curl --get --data-urlencode 'url=https://example.com/' http://127.0.0.1:8080/api/resolve-icon
 docker compose -f docker/compose.yaml logs -f
-docker compose -f docker/compose.yaml down
+docker compose -f docker/compose.yaml down --volumes --remove-orphans
 ```
+
+The resolver smoke test should return HTTP 400 for `https://example.com/`, because only approved macOSicons HTTPS share URLs are accepted. The frontend health endpoint returns HTTP 204. Use `docker compose -f docker/compose.yaml ps` to confirm both services are healthy before debugging requests.
+
+### Versioned local images
+
+Compose uses the mutable local build tags `:ci`. To create explicit release tags for both images, run PowerShell from the repository root:
+
+```powershell
+.\scripts\docker-release.ps1 -Version 3.1.0
+# Optional: also update the mutable :latest tag
+.\scripts\docker-release.ps1 -Version 3.1.0 -UpdateLatest
+```
+
+The script creates a SemVer tag and a `sha-<12-character-commit>` tag for each image. It requires an explicit Docker-compatible SemVer version, refuses to overwrite a version tag that already exists locally, never infers a version from local image history, and never deletes older tags. See [scripts/README.md](scripts/README.md) for constraints and release-tag guidance. The script only tags local images; it does not push to a registry. Use version tags or image digests for deployment and rollback, not `:latest`.
 
 The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
