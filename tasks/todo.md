@@ -1,14 +1,14 @@
 # Docker Production Readiness Tasks
 
 ## Baseline and build hygiene
-- [ ] Review Dockerfiles, Compose, ignore files, workflows, and release script on this branch.
-- [ ] Verify conservative build-context exclusions and absence of secrets from build contexts.
-- [ ] Verify lockfile-based installs and multi-stage frontend build.
+- [x] Review Dockerfiles, Compose, ignore files, workflows, and release script on this branch.
+- [x] Add/verify conservative Dockerfile-specific build-context exclusions for both images.
+- [x] Confirm lockfile install and multi-stage frontend build.
 - [ ] Decide digest-pinning/update policy from verified upstream image digests.
 
 ## Runtime and Compose
-- [ ] Verify non-root runtime, read-only filesystem, dropped capabilities, no-new-privileges, limits, health checks, and bounded logs.
-- [ ] Verify resolver is not host-published and frontend binds to loopback for local Compose.
+- [x] Compose configuration includes non-root image defaults, read-only rootfs, dropped capabilities, no-new-privileges, limits, health checks, and bounded logs.
+- [x] Resolver is not host-published; frontend binds to loopback.
 - [ ] Validate health-check commands exist in final images.
 - [ ] Verify startup, shutdown, and service dependency behavior.
 
@@ -22,11 +22,11 @@
 - [ ] Document and test vulnerability scan severity policy.
 
 ## Image versioning
-- [ ] Use validated Git release tags or explicit SemVer as the release source of truth.
-- [ ] Add commit-SHA tags for traceability.
-- [ ] Apply a shared release version to web and resolver images.
-- [ ] Reject invalid or duplicate release versions.
-- [ ] Keep :ci for builds; treat :latest as mutable convenience only.
+- [x] Require explicit validated SemVer; local image history is no longer used to determine releases.
+- [x] Add shared commit-SHA tags for both images.
+- [x] Apply a shared version tag to both images.
+- [x] Reject invalid versions and locally existing version tags; global duplicate detection requires a configured registry.
+- [x] Keep :ci for builds; make :latest an explicit opt-in.
 - [ ] Test local tagging independent of existing local version history.
 
 ## Registry publishing (gated)
@@ -38,9 +38,9 @@
 - [ ] Add SBOM and provenance where supported.
 
 ## Documentation
-- [ ] Document local build/run/health/test/cleanup commands.
-- [ ] Explain release versions, commit tags, :latest, and digest pinning.
-- [ ] Document registry setup only after target selection.
+- [x] Document build, health, smoke-test, logs, cleanup, and troubleshooting commands.
+- [x] Explain version tags, commit tags, mutable :latest, and digest-based rollback.
+- [x] Leave registry setup/publishing disabled until target and permissions are confirmed.
 - [ ] Mark checks requiring CI or Docker-enabled host.
 
 ## Final verification
