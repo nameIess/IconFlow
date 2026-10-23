@@ -48,4 +48,4 @@
 - [ ] Not yet run: Docker CLI/daemon is unavailable in this workspace; GitHub Docker job also failed before its first step.
 - [ ] PowerShell edge-case tests are committed and wired into CI, but execution is blocked because GitHub jobs fail before steps start.
 - [ ] Final review remains pending until runner validation is available.
-- [ ] Record passed/unrun checks and remaining risks.
+- [x] Record passed/unrun checks and remaining risks in tasks/plan.md; runtime checks remain blocked by runner availability.
