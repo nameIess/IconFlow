@@ -140,18 +140,31 @@ jobs:
               exit 1
             fi
           done
-          for image in "ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver"; do
+          images=("ghcr.io/$owner/iconflow-web" "ghcr.io/$owner/iconflow-resolver")
+          for image in "${images[@]}"; do
             docker push "$image:$version"
             docker push "$image:sha-$short_sha"
-            if [[ "$version" != *-* ]]; then
-              major="${version%%.*}"
-              rest="${version#*.}"
-              minor="${rest%%.*}"
+          done
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            for image in "${images[@]}"; do
               docker push "$image:$major.$minor"
               docker push "$image:$major"
+            done
+            # Move latest only after both images and all stable aliases have been pushed.
+            for image in "${images[@]}"; do
               docker push "$image:latest"
-            fi
-          done
+            done
+          fi
+          {
+            echo "## Published IconFlow Docker release $version"
+            for image in "${images[@]}"; do
+              digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "$image:$version" | sed 's/.*@//')"
+              echo "- `$image:$version` — `$image@$digest`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show container logs on failure
         if: failure()
