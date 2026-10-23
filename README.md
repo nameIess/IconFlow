@@ -66,19 +66,37 @@ docker compose -f docker/compose.yaml down --volumes --remove-orphans
 
 The resolver smoke test should return HTTP 400 for `https://example.com/`, because only approved macOSicons HTTPS share URLs are accepted. The frontend health endpoint returns HTTP 204. Use `docker compose -f docker/compose.yaml ps` to confirm both services are healthy before debugging requests.
 
-### Versioned local images
+### Production image tags and releases
 
-Compose uses the mutable local build tags `:ci`. To create explicit release tags for both images, run PowerShell from the repository root:
+Compose uses the production GHCR image names and defaults to `:latest`:
 
-```powershell
-.\scripts\docker-release.ps1 -Version 3.1.0
-# Optional: also update the mutable :latest tag
-.\scripts\docker-release.ps1 -Version 3.1.0 -UpdateLatest
+```yaml
+image: ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}
+image: ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}
 ```
 
-The script creates a SemVer tag and a `sha-<12-character-commit>` tag for each image. It requires an explicit Docker-compatible SemVer version, refuses to overwrite a version tag that already exists locally, never infers a version from local image history, and never deletes older tags. See [scripts/README.md](scripts/README.md) for constraints and release-tag guidance. The script only tags local images; it does not push to a registry. Use version tags or image digests for deployment and rollback, not `:latest`.
+For local development, `docker compose -f docker/compose.yaml up --build -d` builds the current source and tags it `:latest`. To run a published release, pull and start the chosen tag:
 
-For automated validation of a Git release tag, create a tag such as `v3.1.0` and push it. The Docker workflow validates the tag, builds and smoke-tests both images, and adds version and commit-SHA tags inside the runner. Those runner-local tags are not published or retained after the workflow; registry publishing is intentionally disabled until the registry and access policy are confirmed.
+```bash
+# Convenient rolling deployment (moves when latest is republished)
+docker compose -f docker/compose.yaml pull
+docker compose -f docker/compose.yaml up -d
+
+# Reproducible deployment pinned to the first release
+IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml pull
+IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml up -d
+```
+
+The release workflow is driven by a Git tag, not by local Docker history. For the first release, push `v1.0.0` after the code is ready:
+
+```bash
+git tag -a v1.0.0 -m "IconFlow Docker release 1.0.0"
+git push origin v1.0.0
+```
+
+That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish both images to GHCR with `1.0.0` and `sha-<12-character-commit>` tags. For stable releases it also moves `1.0`, `1`, and `latest` to the new image. Prereleases such as `v1.1.0-rc.1` receive only their version and SHA tags, never `:latest`. Existing version tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
+
+For production rollouts, prefer `IMAGE_TAG=1.0.0` (or a digest) to keep deployments reproducible. The default `:latest` is a convenience pointer and can change when a new stable release passes all gates. See [scripts/README.md](scripts/README.md) for local tagging and troubleshooting.
 
 The base images currently use versioned tags (`node:24-alpine` and `nginxinc/nginx-unprivileged:1.29-alpine`) and CI/release builds use `--pull`. These tags are mutable, so rebuilding later can select newer base layers; this is an explicit update policy, not byte-for-byte reproducibility. Digest pinning is deferred until the correct multi-platform digests and a regular digest-update process are verified. The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
