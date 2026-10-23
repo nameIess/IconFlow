@@ -1,3 +1,5 @@
+name: iconflow
+
 services:
   web:
     image: ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}
