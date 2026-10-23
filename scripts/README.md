@@ -7,10 +7,10 @@ Run the PowerShell release script from the repository root with an explicit vers
 The script accepts Docker-compatible SemVer versions (MAJOR.MINOR.PATCH with an optional prerelease such as 3.1.0-rc.1). An optional leading "v" is accepted. SemVer build metadata (+build) is not supported because Docker tags do not allow the plus sign.
 
 For each service it creates two local tags:
-- iconflow-web:3.1.0 and iconflow-resolver:3.1.0
+- ghcr.io/nameiess/iconflow-web:3.1.0 and ghcr.io/nameiess/iconflow-resolver:3.1.0
 - iconflow-web:sha-<12-character-commit> and iconflow-resolver:sha-<12-character-commit>
 
-The same version and source commit are used for both images, while each image remains independently built and has its own image ID/digest. The script validates Compose, builds both images with --pull, and only tags them after both build outputs exist. It does not inspect local history to guess the next version, delete older images, create Git tags/commits, or push to a registry.
+The same version and source commit are used for both images, while each image remains independently built and has its own image ID/digest. The GitHub Docker release workflow publishes the tested images to GHCR on a validated `v*` Git tag, and advances `latest` only for stable releases after build, scan, health, and smoke-test gates pass. The script validates Compose, builds both images with --pull, and only tags them after both build outputs exist. It does not inspect local history to guess the next version, delete older images, create Git tags/commits, or push to a registry.
 
 The version tag is never overwritten if it already exists locally. This local guard is not a global registry duplicate check; registry publishing remains intentionally disabled until a registry and its access policy are selected.
 
