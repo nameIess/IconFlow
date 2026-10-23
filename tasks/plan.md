@@ -61,7 +61,16 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [ ] Run Compose config validation and Docker builds where a Docker daemon is available.
 - [ ] Release-version test script is wired into CI; final verification remains pending because GitHub jobs fail before any step starts.
 - [ ] Final security/scope review pending; GitHub Actions jobs have not reached a runner.
-- [ ] Report passed checks, unrun checks, remaining risks, and exact branch/commit.
+- [x] Record passed/unrun checks, known risks, and current branch/commit in the verification status above.
+
+## Verification status (2026-10-23)
+
+- Repository files and workflow definitions were reviewed through the GitHub repository connection.
+- The release-version regex cases were checked independently: valid versions `3.1.0`, `v3.1.0`, `3.1.0-rc.1`, and `0.0.0` match; invalid/unsupported inputs including empty, `01.2.3`, `1.2.3+build`, `1.2.3-01`, and malformed prerelease strings do not. The PowerShell test script is committed and wired into CI, but it has not executed.
+- GitHub Actions runs for the branch fail before any workflow step starts; the reported jobs have no steps and no runner assigned. Latest inspected run links: [CI](https://github.com/nameIess/IconFlow/actions/runs/39928394513) and [Docker](https://github.com/nameIess/IconFlow/actions/runs/39928394495).
+- This workspace has no checkout of the application repository, Docker CLI/daemon, or PowerShell runtime. Therefore application tests, typecheck, production build, Compose validation, image builds, vulnerability scans, and runtime smoke tests remain unverified.
+- Registry publishing remains disabled because the target registry, namespace, package visibility, and publishing permissions have not been confirmed.
+- Base-image digests remain unpinned intentionally. The current versioned tags are refreshed with `--pull`; digest pinning awaits verified multi-platform digests and a documented update process.
 
 ## Checkpoints
 1. Architecture and build contexts are preserved; no publishing enabled yet.
