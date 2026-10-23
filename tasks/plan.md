@@ -14,14 +14,14 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 ## Workstreams and tasks
 
 ### 1. Establish baseline and build hygiene
-- [ ] Inspect current Dockerfiles, Compose topology, ignore files, workflows, and scripts.
-- [ ] Verify build contexts exclude secrets, local dependencies, build outputs, and repository metadata without excluding required inputs.
-- [ ] Confirm lockfile-based dependency installation and multi-stage frontend build.
+- [x] Inspect current Dockerfiles, Compose topology, ignore files, workflows, and scripts.
+- [x] Add/verify Dockerfile-specific context exclusions for the frontend and resolver; secrets and local dependency/build-output paths are excluded.
+- [x] Confirm the frontend uses npm ci with package-lock.json in a multi-stage build; resolver runtime uses the Node base image without installing npm dependencies.
 - [ ] Check base-image update policy; only pin digests after verifying the correct platform digests and documenting an update path.
 
 ### 2. Runtime and Compose hardening
-- [ ] Verify both services run non-root and retain read-only filesystems, dropped capabilities, no-new-privileges, resource limits, health checks, and bounded logs.
-- [ ] Verify only the frontend port is published to loopback and the resolver remains private to the Compose network.
+- [x] Compose config retains the non-root images, read-only filesystems, dropped capabilities, no-new-privileges, limits, health checks, and bounded logs.
+- [x] Compose publishes only the frontend on 127.0.0.1:8080; resolver is internal to the Compose network.
 - [ ] Validate health-check tools and paths exist in the final images.
 - [ ] Verify graceful startup, shutdown, and dependency health behavior.
 
@@ -35,12 +35,12 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [ ] Pin third-party actions to reviewed full commit SHAs and document scan severity/blocking policy.
 
 ### 4. Source-driven image versioning
-- [ ] Replace local vN discovery as the release authority with an explicit validated SemVer input or Git release tag.
-- [ ] Generate commit-SHA tags for traceability and stable version tags for releases.
-- [ ] Apply one shared release version to both images while keeping distinct image names and digests.
-- [ ] Ensure duplicate/invalid release versions fail clearly; never silently overwrite a published release.
-- [ ] Keep :ci for local/CI builds and treat :latest as an optional mutable convenience tag, never the rollback source.
-- [ ] Make local tagging safe and predictable without requiring a populated local image history.
+- [x] Release script requires an explicit Docker-compatible SemVer version and no longer infers it from local Docker history.
+- [x] Release script creates commit-SHA tags and stable version tags for both images.
+- [x] Release script applies one explicit version to both image names while preserving separate images.
+- [x] Release script validates version syntax and refuses to overwrite existing local version tags; global duplicate checks are reserved for future registry publishing.
+- [x] Compose keeps :ci; :latest is opt-in via -UpdateLatest and documented as mutable.
+- [x] Explicit versions remove dependence on local image history; old tags are never automatically deleted.
 
 ### 5. Registry publishing (gated)
 - [ ] Confirm target registry, image namespace, package visibility, and publishing permissions before enabling push.
@@ -51,10 +51,10 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [ ] Generate SBOM and provenance/attestations when supported by the selected registry and workflow.
 
 ### 6. Documentation
-- [ ] Document local build, run, health, smoke-test, cleanup, tagging, and troubleshooting commands.
-- [ ] Explain CI tags versus release tags, mutable :latest, SemVer release tags, and digest-based deployment.
-- [ ] Document required GitHub settings/secrets only after registry choice is confirmed.
-- [ ] Clearly distinguish implemented behavior from checks that require CI or a Docker-enabled host.
+- [x] Documented local build, health, smoke-test, logs, cleanup, tagging, and troubleshooting commands.
+- [x] Documented SemVer/commit tags, mutable :latest, and digest-based deployment/rollback.
+- [x] No registry secrets or publishing settings added while registry choice remains unconfirmed.
+- [x] Documentation distinguishes implemented local behavior from registry publishing, which remains disabled.
 
 ### 7. Verification and delivery
 - [ ] Run available application tests, typecheck, and production build.
