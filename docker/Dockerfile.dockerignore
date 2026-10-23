@@ -1,0 +1,17 @@
+.git
+.github
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets
+docker/compose.yaml
+docker/resolver
+
+# Documentation and planning files are not required to build the frontend.
+README.md
+tasks
