@@ -78,7 +78,7 @@ Compose uses the mutable local build tags `:ci`. To create explicit release tags
 
 The script creates a SemVer tag and a `sha-<12-character-commit>` tag for each image. It requires an explicit Docker-compatible SemVer version, refuses to overwrite a version tag that already exists locally, never infers a version from local image history, and never deletes older tags. See [scripts/README.md](scripts/README.md) for constraints and release-tag guidance. The script only tags local images; it does not push to a registry. Use version tags or image digests for deployment and rollback, not `:latest`.
 
-The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
+The base images currently use maintained version-channel tags (`node:24-alpine` and `nginxinc/nginx-unprivileged:1.29-alpine`) and CI/release builds use `--pull`. These tags are mutable, so rebuilding later can select newer base layers; this is an explicit update policy, not byte-for-byte reproducibility. Digest pinning is deferred until the correct multi-platform digests and a regular digest-update process are verified. The first build needs network access to download base images and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
 ## API keys 🔑
 
@@ -129,7 +129,7 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 
 ## Development and GitHub Actions 🧰
 
-The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**` and `fix/**`, and manual dispatch:
+The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**`, `feat/**`, and `fix/**`, and manual dispatch:
 
 - **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
 - **Docker** — `.github/workflows/docker.yml`: validates Compose, builds both images with pull-enabled base tags, scans both images for fixable HIGH/CRITICAL vulnerabilities, starts the containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
