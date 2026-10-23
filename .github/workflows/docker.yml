@@ -50,8 +50,11 @@ jobs:
       - name: Validate Compose configuration
         run: docker compose -f docker/compose.yaml config --quiet
 
-      - name: Build and start containers
-        run: docker compose -f docker/compose.yaml up --build --detach --wait --wait-timeout 90
+      - name: Build images
+        run: docker compose -f docker/compose.yaml build --pull
+
+      - name: Start containers and wait for health
+        run: docker compose -f docker/compose.yaml up --detach --no-build --wait --wait-timeout 90
 
       - name: Smoke-test frontend and resolver
         shell: bash
