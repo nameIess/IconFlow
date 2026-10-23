@@ -1,0 +1,69 @@
+name: IconFlow App Build
+
+run-name: >-
+  IconFlow App Build · ${{ github.event_name == 'pull_request'
+  && format('PR #{0}', github.event.number)
+  || github.ref_name }}
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iconflow-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app-build:
+    name: Build production app
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Upload production build
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.6.2
+        with:
+          name: iconflow-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
