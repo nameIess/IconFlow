@@ -1,3 +1,6 @@
+import { MACOSICONS_HOSTS, parseImportUrl } from "./import-parser";
+export { parseIconImportText } from "./import-parser";
+
 export type IconHit = {
   appName: string;
   lowResPngUrl?: string;
@@ -416,17 +419,6 @@ export type ImportedIconResult = {
   usedBackup: boolean;
 };
 
-const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
-
-function parseImportUrl(value: string): URL | null {
-  try {
-    const url = new URL(value.trim());
-    return url.protocol === "https:" && !url.username && !url.password && !url.port ? url : null;
-  } catch {
-    return null;
-  }
-}
-
 async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: string; previewUrl?: string }> {
   const endpoint = `/api/resolve-icon?url=${encodeURIComponent(url)}`;
   const response = await fetch(endpoint, { cache: "no-store" });
@@ -448,44 +440,6 @@ async function resolveMacosiconsShareUrl(url: string): Promise<{ assetUrl: strin
     assetUrl: value.assetUrl,
     previewUrl: typeof value.previewUrl === "string" ? value.previewUrl : undefined,
   };
-}
-
-export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
-  const seen = new Set<string>();
-  const urls: string[] = [];
-  let invalidCount = 0;
-
-  for (const line of text.split(/\r?\n/)) {
-    const value = line.trim();
-    if (!value) continue;
-
-    const candidates = value.match(/https:\/\/[^\s<>"']+/gi) || [value];
-    let added = false;
-
-    for (const raw of candidates) {
-      const cleaned = raw.replace(/[),.;]+$/, "");
-      const url = parseImportUrl(cleaned);
-      if (!url) continue;
-
-      const host = url.hostname.toLowerCase();
-      const supported = MACOSICONS_HOSTS.has(host) ||
-        (host === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
-
-      if (!supported) continue;
-
-      const normalized = url.toString();
-      if (!seen.has(normalized)) {
-        seen.add(normalized);
-        urls.push(normalized);
-      }
-      added = true;
-    }
-
-    if (!added) invalidCount += 1;
-    if (urls.length >= 100) break;
-  }
-
-  return { urls: urls.slice(0, 100), invalidCount };
 }
 
 export async function importIconUrls(urls: string[]): Promise<ImportedIconResult> {

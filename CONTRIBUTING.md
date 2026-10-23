@@ -12,7 +12,7 @@ Thank you for helping improve IconFlow! Contributions are welcome, including bug
 ### Set up the project
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/nameIess/IconFlow.git
 cd IconFlow
 npm ci
 npm run dev
@@ -33,6 +33,7 @@ Create a local `.env` file from `.env.example` when environment configuration is
 Run the checks relevant to your change before opening a pull request:
 
 ```bash
+npm test
 npm run typecheck
 npm run build
 ```

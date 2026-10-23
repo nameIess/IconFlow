@@ -24,12 +24,80 @@ npm ci
 npm run dev
 ```
 
-Run the checks used for production builds with:
+Run the checks locally with:
 
 ```bash
+npm test
 npm run typecheck
 npm run build
 ```
+
+## Docker 🐳
+
+Docker configuration lives in `docker/`. One GHCR image contains the static frontend and API resolver runtime; Compose starts it twice as isolated web and resolver containers. Only the frontend is published to the host; the resolver is reachable only through the Compose network.
+
+### Prerequisites
+
+- Docker Engine with the Compose plugin, or Docker Desktop with Compose
+
+### Start locally
+
+Run these commands from the repository root:
+
+```bash
+docker compose -f docker/compose.yaml up --build --detach --wait
+docker compose -f docker/compose.yaml ps
+```
+
+Open [http://localhost:8080](http://localhost:8080).
+
+The port is bound to `127.0.0.1` so the app is not exposed to other machines by default. The containers run as non-root users, drop Linux capabilities, enable `no-new-privileges`, use read-only root filesystems with temporary writable mounts, and have resource limits and health checks.
+
+### Health, smoke test, logs, and shutdown
+
+```bash
+docker compose -f docker/compose.yaml ps
+curl --fail http://127.0.0.1:8080/
+curl --fail http://127.0.0.1:8080/healthz
+curl --get --data-urlencode 'url=https://example.com/' http://127.0.0.1:8080/api/resolve-icon
+docker compose -f docker/compose.yaml logs -f
+docker compose -f docker/compose.yaml down --volumes --remove-orphans
+```
+
+The resolver smoke test should return HTTP 400 for `https://example.com/`, because only approved macOSicons HTTPS share URLs are accepted. The frontend health endpoint returns HTTP 204. Use `docker compose -f docker/compose.yaml ps` to confirm both services are healthy before debugging requests.
+
+### Production image tags and releases
+
+Compose uses one production GHCR image and defaults to `:latest`:
+
+```yaml
+image: ghcr.io/nameiess/iconflow:${IMAGE_TAG:-latest}
+```
+
+For local development, `docker compose -f docker/compose.yaml up --build -d` builds the current source and tags it `:latest`. To run a published release, pull and start the chosen tag:
+
+```bash
+# Convenient rolling deployment (moves when latest is republished)
+docker compose -f docker/compose.yaml pull
+docker compose -f docker/compose.yaml up --detach --wait
+
+# Reproducible deployment pinned to the first release
+IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml pull
+IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml up --detach --wait
+```
+
+The release workflow is driven by a Git tag, not by local Docker history. For the first release, push `v1.0.0` after the code is ready:
+
+```bash
+git tag -a v1.0.0 -m "IconFlow Docker release 1.0.0"
+git push origin v1.0.0
+```
+
+That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish one image to GHCR with `1.0.0` and `sha-<12-character-commit>` tags. For stable releases it also moves `1.0`, `1`, and `latest` to the new image. Prereleases such as `v1.1.0-rc.1` receive only their version and SHA tags, never `:latest`. Existing version tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
+
+For production rollouts, prefer `IMAGE_TAG=1.0.0` (or a digest) to keep deployments reproducible. The default `:latest` is a convenience pointer and can change when a new stable release passes all gates. See [scripts/README.md](scripts/README.md) for local tagging and troubleshooting.
+
+The combined image currently uses the versioned `node:24-alpine` base and installs Alpine's Nginx package; CI/release builds use `--pull`. These inputs are mutable, so rebuilding later can select newer base layers; this is an explicit update policy, not byte-for-byte reproducibility. Digest pinning is deferred until the correct multi-platform digests and a regular digest-update process are verified. The first build needs network access to download the base image, Alpine packages, and npm packages. Docker CI also downloads Trivy vulnerability databases during image scanning. The resolver also needs outbound HTTPS access to the allow-listed macOSicons hosts to resolve shared icon links. Do not publish the resolver port directly or mount the Docker socket into either container.
 
 ## API keys 🔑
 
@@ -66,7 +134,7 @@ Pages are fixed at 50 icons by default:
 
 ## Importing icons 📥
 
-Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) calls `GET /api/resolve-icon?url=…`. The serverless resolver fetches share pages only from allow-listed macOSicons hosts, follows at most three allow-listed redirects, caps the page at 2 MB, and extracts asset URLs from `s3-new.macosicons.com`. Direct asset links are validated before import. Imports do not use a search API key. Imported icons are merged into the grid and de-duplicated against existing results by icon ID and asset URLs.
+Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) calls `GET /api/resolve-icon?url=…`. The resolver fetches share pages only from allow-listed macOSicons hosts, follows at most three allow-listed redirects, caps the page at 2 MB, and extracts asset URLs from `s3-new.macosicons.com`. Direct asset links are validated before import. Imports do not use a search API key. Imported icons are merged into the grid and de-duplicated against existing results by icon ID and asset URLs.
 
 ## Security 🛡️
 
@@ -75,18 +143,22 @@ Pasting a macOSicons share URL (or uploading a `.txt` list, up to 100 links) cal
 - Only HTTPS icon sources from the allow-listed macOSicons asset host are accepted.
 - Creator links are only opened when they use HTTPS.
 - Requests have timeouts and response-size limits.
-- Content Security Policy and Vercel security headers are enabled.
+- Content Security Policy and security headers are configured for both Vercel and the Docker web server.
+- Docker's resolver is not published to the host; the local web port binds to loopback.
 
-## Development 🧰
+## Development and GitHub Actions 🧰
 
-Node.js 24 is used in CI (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
+The GitHub Actions workflows are split into two responsibilities. Both run on pull requests targeting `master`, pushes to `feature/**`, `feat/**`, and `fix/**`, and manual dispatch. The Docker workflow also runs on `v*` Git tags to validate and publish a production release to GHCR:
 
-CI runs `npm ci --ignore-scripts --no-fund`, checks dependencies with `npm audit --audit-level=high`, and runs the typecheck/build even when the audit reports a vulnerability. A final enforcement step keeps the audit a required gate without hiding unrelated build failures. The workflow runs on pull requests targeting `master` and manual dispatch; it does not run on every push.
+- **CI** — `.github/workflows/ci.yml`: runs `npm test`, TypeScript type-checking, `npm audit --audit-level=high`, and `npm run build` to verify the production app.
+- **Docker** — `.github/workflows/docker.yml`: validates Compose, builds one image with pull-enabled base tags, scans it for fixable HIGH/CRITICAL vulnerabilities, starts both containers, waits for health checks, and smoke-tests the frontend and resolver. A qualifying Trivy finding fails the workflow; findings without an available fix are currently excluded from this blocking gate.
+
+Node.js 24 is used in CI and builds (`.nvmrc`); Vite 8 itself requires Node.js `^20.19.0 || >=22.12.0`.
 
 ## Contributing 🤝
 
 1. Create a focused branch for your change.
-2. Run `npm run typecheck` and `npm run build`.
+2. Run `npm test`, `npm run typecheck`, and `npm run build`.
 3. Update the relevant documentation when behavior changes.
 4. Open a pull request using the repository template.
 

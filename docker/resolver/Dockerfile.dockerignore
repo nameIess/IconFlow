@@ -1,0 +1,6 @@
+**
+!api/
+!api/resolve-icon.ts
+!docker/
+!docker/resolver/
+!docker/resolver/server.mjs

@@ -1,0 +1,175 @@
+name: IconFlow Docker
+
+run-name: >-
+  IconFlow Docker · ${{ github.event_name == 'pull_request'
+  && format('PR #{0}', github.event.number)
+  || github.ref_name }}
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+  push:
+    branches:
+      - 'feature/**'
+      - 'feat/**'
+      - 'fix/**'
+    tags:
+      - 'v*'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iconflow-docker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container:
+    name: Build and smoke-test Docker Compose
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      IMAGE_TAG: ci
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require release commit to be on master
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin master --no-tags
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD; then
+            echo "Release tags must point to a commit already reachable from master." >&2
+            exit 1
+          fi
+
+      - name: Validate Compose configuration
+        run: docker compose -f docker/compose.yaml config --quiet
+
+      - name: Build images
+        run: docker compose -f docker/compose.yaml build --pull
+
+      - name: Tag images for a Git release tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(printf '%s' "$GITHUB_REF_NAME" | sed 's/^v//')"
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?$'
+          if [[ ! "$version" =~ $semver ]]; then
+            echo "Invalid release tag '$GITHUB_REF_NAME'. Expected vMAJOR.MINOR.PATCH with optional prerelease and no build metadata." >&2
+            exit 1
+          fi
+          short_sha="$(printf '%s' "$GITHUB_SHA" | cut -c1-12)"
+          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/$owner/iconflow"
+          docker image tag "$image:ci" "$image:$version"
+          docker image tag "$image:ci" "$image:sha-$short_sha"
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            docker image tag "$image:ci" "$image:$major"
+            docker image tag "$image:ci" "$image:$major.$minor"
+            docker image tag "$image:ci" "$image:latest"
+          fi
+
+      - name: Scan IconFlow image for fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          image-ref: ghcr.io/nameiess/iconflow:ci
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Start containers and wait for health
+        run: docker compose -f docker/compose.yaml up --detach --no-build --wait --wait-timeout 90
+
+      - name: Smoke-test frontend and resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error http://127.0.0.1:8080/ -o /tmp/iconflow-index.html
+          grep -q '<div id="root">' /tmp/iconflow-index.html
+          curl --fail --silent --show-error http://127.0.0.1:8080/healthz -o /dev/null
+          status="$(curl --silent --show-error --output /tmp/iconflow-api.json --write-out '%{http_code}' \
+            --get --data-urlencode 'url=https://example.com/' \
+            http://127.0.0.1:8080/api/resolve-icon)"
+          test "$status" = "400"
+          grep -q 'Only macOSicons HTTPS share URLs are supported' /tmp/iconflow-api.json
+
+      - name: Publish validated release images to GHCR
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          version="${GITHUB_REF_NAME#v}"
+          short_sha="${GITHUB_SHA:0:12}"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image="ghcr.io/$owner/iconflow"
+          for tag in "$version" "sha-$short_sha"; do
+            if docker manifest inspect "$image:$tag" >/dev/null 2>&1; then
+              echo "Refusing to overwrite existing release tag $image:$tag" >&2
+              exit 1
+            fi
+          done
+          push_output="$(docker push "$image:$version" 2>&1)" || {
+            printf '%s\n' "$push_output" >&2
+            exit 1
+          }
+          printf '%s\n' "$push_output"
+          digest="$(printf '%s\n' "$push_output" | sed -nE 's/.*digest: (sha256:[0-9a-f]{64}).*/\1/p' | tail -n 1)"
+          if [[ -z "$digest" ]]; then
+            echo "Could not extract the pushed digest for $image:$version" >&2
+            exit 1
+          fi
+          docker push "$image:sha-$short_sha"
+          if [[ "$version" != *-* ]]; then
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            docker push "$image:$major.$minor"
+            docker push "$image:$major"
+            docker push "$image:latest"
+          fi
+          {
+            echo "## Published IconFlow Docker release $version"
+            echo "- `$image:$version` — `$image@$digest`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f docker/compose.yaml logs --no-color
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f docker/compose.yaml down --volumes --remove-orphans

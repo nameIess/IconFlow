@@ -1,16 +1,18 @@
 name: "🐛 Bug report"
-description: Report a reproducible problem in IconFlow
+description: Report a reproducible problem with IconFlow
 title: "[Bug]: "
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve **IconFlow**! Please search existing issues first, then share enough detail for us to reproduce the problem.
+        Thanks for helping improve **IconFlow**. Before opening an issue, search for an existing report.
+
+        **Protect your privacy:** never post API keys, access tokens, private URLs, personal data, or unredacted logs. Public issues are visible to everyone.
   - type: textarea
     id: summary
     attributes:
       label: What happened?
-      description: Describe the bug clearly. What did you expect to happen instead?
+      description: Describe the actual behavior and what you expected instead.
       placeholder: "When I…, I expected…, but…"
     validations:
       required: true
@@ -18,50 +20,58 @@ body:
     id: area
     attributes:
       label: Affected area
-      description: Where did you encounter the problem?
+      description: Which part of IconFlow is affected?
       options:
         - Icon search
-        - Icon editor / masking
+        - Icon editor or masking
         - AI icon generation
-        - Image conversion / export
+        - Image conversion or export
         - Background removal
         - Favicon or release pack
-        - API / authentication
-        - Usage limits / billing
-        - Website / UI
-        - Other
+        - API or authentication
+        - Usage limits
+        - Website or interface
+        - Other / not sure
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
       label: Steps to reproduce
-      description: List the exact steps. Include a minimal example if possible.
+      description: Give the smallest set of steps that reliably reproduces the problem.
       placeholder: |
         1. Open…
         2. Choose…
-        3. Click…
+        3. Select…
         4. Observe…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. actual behavior
+      description: What should happen, and what happens instead?
+      placeholder: "Expected… / Actual…"
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
-      label: Logs, screenshots, or response
-      description: Paste relevant error messages, HTTP status codes, request IDs, or screenshots. Remove API keys and other secrets before posting.
+      label: Logs, screenshots, or error details
+      description: Include relevant errors, HTTP status codes, or redacted request/response examples. Remove secrets and personal data.
       render: text
   - type: input
     id: environment
     attributes:
       label: Environment
-      description: Browser/OS, app version or commit, and runtime if relevant.
-      placeholder: "e.g. macOS 15, Chrome, API client"
+      description: Browser and version, operating system, app version/commit, or runtime as applicable.
+      placeholder: "e.g. Firefox 132 on Ubuntu 24.04"
   - type: checkboxes
     id: checks
     attributes:
-      label: Before submitting
+      label: Submission checklist
       options:
-        - label: I searched existing issues and could not find a duplicate.
+        - label: I searched existing issues for a duplicate.
           required: true
-        - label: I removed API keys, tokens, and other sensitive data from this report.
+        - label: I removed secrets and private or personal information.
           required: true

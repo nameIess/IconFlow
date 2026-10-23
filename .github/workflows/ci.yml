@@ -1,11 +1,26 @@
 name: IconFlow CI
-run-name: "CI • ${{ github.event_name == 'pull_request' && format('PR #{0}: {1}', github.event.number, github.event.pull_request.title) || format('{0} @ {1}', github.ref_name, github.sha) }}"
+
+run-name: >-
+  IconFlow CI · ${{ github.event_name == 'pull_request'
+  && format('PR #{0}', github.event.number)
+  || github.ref_name }}
 
 on:
   pull_request:
-    branches: [master]
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
   push:
-    branches: [master]
+    branches:
+      - 'feature/**'
+      - 'feat/**'
+      - 'fix/**'
+
   workflow_dispatch:
 
 permissions:
@@ -16,42 +31,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  production-readiness:
-    name: IconFlow production readiness
-    runs-on: ubuntu-latest
+  quality:
+    name: Tests, typecheck, audit, and build
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     permissions:
       contents: read
 
     steps:
-      - name: Checkout IconFlow
+      - name: Checkout source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Set up Node.js 24
+      - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: "24"
-          package-manager-cache: false
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Validate Docker release version rules
+        run: node scripts/test-docker-release-version.mjs
 
       - name: Install locked dependencies
-        run: npm ci --ignore-scripts --no-fund --no-audit
+        run: npm ci --no-audit --no-fund
 
-      - name: Audit dependencies
-        id: audit
-        continue-on-error: true
-        run: npm audit --audit-level=high
+      - name: Unit and integration tests
+        run: npm test
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Production build
-        run: npm run build
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
-      - name: Enforce dependency audit result
-        if: steps.audit.outcome == 'failure'
-        run: |
-          echo "::error::Dependency audit failed. Review the audit output for vulnerabilities or registry errors."
-          exit 1
+      - name: Build production app
+        run: npm run build
