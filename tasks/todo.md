@@ -34,8 +34,8 @@
 - [x] Use job-scoped packages:write and GITHUB_TOKEN login without build args or embedded credentials.
 - [x] Publish only on validated v* tag pushes after all Docker checks pass.
 - [x] Push the same image IDs built, scanned, health-checked, and smoke-tested.
-- [ ] Capture published image digests in workflow output/release notes.
-- [ ] Add SBOM/provenance after release publishing is verified.
+- [x] Write pushed version tags and repository digests to the GitHub Actions step summary.
+- [ ] SBOM and provenance/attestations remain follow-up production hardening.
 
 ## Documentation
 - [x] Document build, health, smoke-test, logs, cleanup, and troubleshooting commands.
