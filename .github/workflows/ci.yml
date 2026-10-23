@@ -31,7 +31,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Tests, typecheck, and dependency audit
+    name: Tests, typecheck, audit, and build
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.draft == false
@@ -65,3 +65,6 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=high
+
+      - name: Build production app
+        run: npm run build
