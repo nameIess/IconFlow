@@ -43,12 +43,12 @@ Make the existing Docker setup reproducible, testable, secure by default, and re
 - [x] Explicit versions remove dependence on local image history; old tags are never automatically deleted.
 
 ### 5. Registry publishing (gated)
-- [ ] Confirm target registry, image namespace, package visibility, and publishing permissions before enabling push.
-- [ ] Authenticate using least-privilege GitHub Actions permissions; never put credentials in build args or image layers.
-- [ ] Publish only from trusted release events, not pull requests or arbitrary feature branches.
-- [ ] Build/test once, then publish the tested artifacts; avoid publishing an unverified rebuild.
-- [ ] Record immutable image digests and retain a reliable rollback reference.
-- [ ] Generate SBOM and provenance/attestations when supported by the selected registry and workflow.
+- [x] Choose GHCR namespace `ghcr.io/nameiess/{iconflow-web,iconflow-resolver}` and configure release publishing with least-privilege `packages: write`; package visibility still must be set in GitHub Packages.
+- [x] Release job uses the ephemeral `GITHUB_TOKEN` with job-scoped `packages: write`; credentials are piped to `docker login` and not passed to builds.
+- [x] Publishing runs only for pushed `v*` Git tags after build, scan, health, and smoke-test steps pass.
+- [x] The exact tested local image IDs are tagged and pushed after the validation gates in the same runner.
+- [ ] Workflow tags releases with SemVer and commit SHA; recording pushed digests as release artifacts remains to be added.
+- [ ] SBOM and provenance/attestations remain to be added after publication behavior is verified.
 
 ### 6. Documentation
 - [x] Documented local build, health, smoke-test, logs, cleanup, tagging, and troubleshooting commands.
