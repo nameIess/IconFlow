@@ -1,6 +1,6 @@
 services:
   web:
-    image: iconflow-web:ci
+    image: ghcr.io/nameiess/iconflow-web:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -33,7 +33,7 @@ services:
         max-file: "3"
 
   resolver:
-    image: iconflow-resolver:ci
+    image: ghcr.io/nameiess/iconflow-resolver:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: docker/resolver/Dockerfile
