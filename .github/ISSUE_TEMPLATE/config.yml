@@ -1,9 +1,8 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
   - name: IconFlow website
     url: https://icon-flow-nu.vercel.app/
     about: Try IconFlow's icon tools and learn about the project.
-
   - name: macOSicons
     url: https://macosicons.com
     about: Browse macOS icons and related resources.
