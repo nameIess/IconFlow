@@ -1,11 +1,13 @@
 name: "💬 Question / support"
 description: Ask for help using IconFlow or its API
 title: "[Question]: "
+labels:
+  - question
 body:
   - type: markdown
     attributes:
       value: |
-        Tell us what you're trying to accomplish and where you're stuck. Include only the details needed to understand the issue.
+        Tell us what you're trying to accomplish and where you're stuck. Include only details needed to understand the question.
 
         **This is a public forum. Never include API keys, access tokens, private user data, or confidential logs.**
   - type: dropdown
@@ -15,18 +17,20 @@ body:
       options:
         - Website or editor
         - Finding icons
-        - Generating or editing icons
-        - Exporting or converting assets
+        - Importing shared links
+        - Editing, generating, or converting icons
         - API integration
         - Authentication or usage limits
+        - Docker or deployment
+        - Contributing or development setup
         - Other / not sure
     validations:
       required: true
   - type: textarea
-    id: question
+    id: goal
     attributes:
       label: What are you trying to do?
-      description: Describe your goal, the relevant feature or endpoint, and the problem you're facing.
+      description: Describe the goal, relevant feature or endpoint, and the problem.
       placeholder: "I'm trying to… but…"
     validations:
       required: true
@@ -34,18 +38,23 @@ body:
     id: tried
     attributes:
       label: What have you tried?
-      description: Share relevant steps, a minimal code sample, or a redacted request/response if useful.
+      description: Share relevant steps, minimal code, or a redacted request/response.
       placeholder: "I tried… and got…"
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message or behavior
+      description: Include the exact message or status code if available, with secrets removed.
+      render: text
   - type: input
     id: docs
     attributes:
       label: Relevant documentation or public link
-      description: Optional link to the documentation or example you're following.
       placeholder: "https://…"
   - type: checkboxes
     id: checks
     attributes:
-      label: Submission checklist
+      label: Checklist
       options:
-        - label: I removed credentials and private or personal information.
+        - label: I removed credentials and private/personal information.
           required: true
