@@ -1,18 +1,37 @@
 name: "✨ Feature request"
 description: Propose an improvement or capability for IconFlow
 title: "[Feature]: "
+labels:
+  - enhancement
 body:
   - type: markdown
     attributes:
       value: |
-        Help us understand the user need behind your idea. Search existing issues first; requests with a clear problem and use case are easier to evaluate.
+        Help us understand the user need behind your idea. Search existing issues first.
 
-        Please don't include private user data, credentials, or confidential information.
+        Do not include API keys, access tokens, private user data, or confidential information.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      options:
+        - Icon search and discovery
+        - Search pagination and caching
+        - Import shared links or text lists
+        - Icon editing, masking, or generation
+        - Conversion and export
+        - API and developer experience
+        - Performance and reliability
+        - Accessibility and interface
+        - Security and privacy
+        - Other / not sure
+    validations:
+      required: true
   - type: textarea
     id: problem
     attributes:
       label: What problem would this solve?
-      description: Describe the friction or limitation you encounter and who it affects.
+      description: Describe the friction or limitation and who it affects.
       placeholder: "When I need to…, the current workflow…"
     validations:
       required: true
@@ -20,47 +39,46 @@ body:
     id: solution
     attributes:
       label: Proposed solution
-      description: Explain the behavior or workflow you would like to see. A specific implementation is optional.
+      description: Describe the behavior or workflow you would like. A specific implementation is optional.
       placeholder: "It would help if IconFlow could…"
-    validations:
-      required: true
-  - type: dropdown
-    id: area
-    attributes:
-      label: Feature area
-      options:
-        - Icon search and discovery
-        - Icon editing and customization
-        - AI generation
-        - Conversion and export
-        - Background removal
-        - API and developer experience
-        - Performance and reliability
-        - Accessibility and interface
-        - Other / not sure
     validations:
       required: true
   - type: textarea
     id: usecase
     attributes:
       label: Example use case
-      description: How would this help you? Describe a practical workflow or outcome.
+      description: Walk through a realistic workflow or outcome.
       placeholder: "I would use this to…"
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Who benefits most?
+      options:
+        - Most IconFlow users
+        - Developers integrating the API
+        - Users importing shared icon links
+        - Users exporting or converting assets
+        - Accessibility or keyboard users
+        - Other / not sure
+    validations:
+      required: true
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives or workarounds
-      description: Mention existing tools, workarounds, or approaches you've tried.
+      description: Mention workarounds or approaches you have already tried.
       placeholder: "So far, I've tried…"
   - type: textarea
     id: extra
     attributes:
       label: Examples or additional context
-      description: Add relevant links, mockups, or sample inputs. Only share material you are allowed to make public.
+      description: Add public links, mockups, or sample inputs you are allowed to share.
   - type: checkboxes
     id: checks
     attributes:
       label: Submission checklist
       options:
         - label: I searched existing issues for a similar request.
+          required: true
+        - label: I removed credentials and private or personal information.
           required: true
