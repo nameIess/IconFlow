@@ -1,0 +1,25 @@
+name: "📝 Blank issue"
+description: Open a general issue when none of the structured forms fit
+title: ""
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for an issue that does not fit the other templates. Search for duplicates first.
+
+        Do not include API keys, access tokens, private URLs, personal data, or unredacted logs.
+  - type: textarea
+    id: details
+    attributes:
+      label: Issue details
+      description: Explain the problem, request, or discussion topic.
+      placeholder: "Describe your issue…"
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy checklist
+      options:
+        - label: I have not included credentials or private/personal information.
+          required: true
