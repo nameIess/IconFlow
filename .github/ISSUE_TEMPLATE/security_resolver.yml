@@ -1,0 +1,86 @@
+name: "🛡️ API resolver, security, or privacy"
+description: Report problems with the URL resolver, validation, timeouts, or sensitive-data handling
+title: "[Security/Resolver]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for IconFlow's share-link resolver, allow-list validation, redirects, response limits, timeouts, or sensitive-data handling.
+
+        **Do not disclose exploitable details publicly.** Do not include working exploit payloads, secrets, user data, or private infrastructure details. If the repository provides a private security reporting channel, use it instead.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Report category
+      options:
+        - Valid public share link is rejected
+        - Redirect handling problem
+        - Host or URL validation problem
+        - Timeout or response-size limit issue
+        - Sensitive data may be exposed or logged
+        - API key handling or privacy concern
+        - Other security/reliability concern
+    validations:
+      required: true
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Observed impact
+      options:
+        - Feature is blocked
+        - Incorrect but non-sensitive response
+        - Potential privacy or security impact
+        - Confirmed security impact
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the behavior at a high level without publishing sensitive exploit details.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Safe reproduction
+      description: Provide minimal non-sensitive steps. Omit exploit strings and private hosts if they would create risk.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected safe behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Actual behavior
+      description: Include only redacted messages/status codes.
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Local development
+        - Production website
+        - Docker deployment
+        - CI / release workflow
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: disclosure
+    attributes:
+      label: Disclosure checklist
+      options:
+        - label: I have not included secrets, personal data, or a public exploit payload.
+          required: true
+        - label: I understand this issue may be publicly visible.
+          required: true
