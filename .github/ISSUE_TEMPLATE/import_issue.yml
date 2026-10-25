@@ -1,0 +1,79 @@
+name: "📥 Icon import or shared-link issue"
+description: Report problems importing macOSicons share links or .txt lists
+title: "[Import]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        IconFlow imports approved macOSicons share links and .txt lists. Share only public URLs you are allowed to disclose; do not include private links or credentials.
+  - type: dropdown
+    id: import_type
+    attributes:
+      label: Import method
+      options:
+        - Paste a macOSicons share URL
+        - Upload a .txt list of links
+        - Open or resolve a direct icon asset URL
+        - Other / not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: Failure type
+      options:
+        - Link is rejected as invalid
+        - Imported icon does not appear
+        - Some links in a list are skipped
+        - Duplicate icons appear
+        - Import hangs or times out
+        - Unsupported host or redirect behavior
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Public sample link or sanitized list
+      description: Provide a public reproducible sample if safe. Redact tracking data and never include secrets.
+      placeholder: "https://macosicons.com/… or a few sanitized .txt lines"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open IconFlow…
+        2. Paste/upload…
+        3. Start the import…
+        4. Observe…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected outcome
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Actual outcome
+      description: Include any visible message or HTTP status, if shown.
+    validations:
+      required: true
+  - type: input
+    id: count
+    attributes:
+      label: Number of links (for .txt imports)
+      placeholder: "e.g. 12 (maximum supported is 100)"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checklist
+      options:
+        - label: I have permission to share the sample links and removed private information.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true
