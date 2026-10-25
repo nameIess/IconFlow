@@ -1,0 +1,84 @@
+name: "🔎 Search, pagination, or caching"
+description: Report issues specifically with icon search results and paging
+title: "[Search]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for query behavior, result ordering, pagination, caching, or search-key fallback. Never include a real API key; replace it with a placeholder.
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What is going wrong?
+      options:
+        - Search returns an error
+        - Results are missing or unexpected
+        - Pagination repeats or skips icons
+        - Cached results appear stale
+        - Duplicate requests or loading state issue
+        - Primary/backup key fallback behaves incorrectly
+        - Search is slow or hangs
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: query
+    attributes:
+      label: Example search query
+      description: Use a non-sensitive query; do not paste a key or private data.
+      placeholder: "e.g. safari"
+    validations:
+      required: true
+  - type: dropdown
+    id: page_state
+    attributes:
+      label: Pagination state
+      options:
+        - First page
+        - Later page
+        - Final page
+        - Not applicable
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected results
+      description: Include expected page/count/order if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed results
+      description: Describe what you actually see. Include redacted status/error text if available.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Search for…
+        2. Move to page…
+        3. Change query/key or reload…
+        4. Observe…
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and version
+      placeholder: "e.g. Chrome on macOS"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I did not include any real API keys or tokens.
+          required: true
+        - label: I checked for duplicate reports.
+          required: true
