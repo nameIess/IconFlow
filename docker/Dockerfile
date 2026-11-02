@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM node:24-alpine AS build
+# Keep the bundled npm CLI and its transitive dependencies patched.
+RUN npm install --global npm@12.2.1 --no-audit --no-fund
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -9,7 +11,9 @@ COPY . .
 RUN npm run build
 
 FROM node:24-alpine AS runtime
-RUN apk add --no-cache nginx
+# The runtime image also contains npm; update it to remove vulnerable bundled dependencies.
+RUN npm install --global npm@12.2.1 --no-audit --no-fund \
+    && apk add --no-cache nginx
 
 ENV NODE_ENV=production
 WORKDIR /app
