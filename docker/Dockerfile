@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 FROM node:24-alpine AS build
-# Keep the bundled npm CLI and its transitive dependencies patched.
-RUN npm install --global npm@12.2.1 --no-audit --no-fund
+# Patch npm's bundled undici dependency; npm 12.2.1 still ships vulnerable 6.29.0.
+RUN npm install --global npm@12.2.1 --no-audit --no-fund \
+    && npm install --prefix "$(npm root -g)/npm" --no-save --package-lock=false --ignore-scripts undici@6.29.1 --no-audit --no-fund
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -11,8 +12,9 @@ COPY . .
 RUN npm run build
 
 FROM node:24-alpine AS runtime
-# The runtime image also contains npm; update it to remove vulnerable bundled dependencies.
+# The runtime image contains npm too, so patch its bundled undici dependency as well.
 RUN npm install --global npm@12.2.1 --no-audit --no-fund \
+    && npm install --prefix "$(npm root -g)/npm" --no-save --package-lock=false --ignore-scripts undici@6.29.1 --no-audit --no-fund \
     && apk add --no-cache nginx
 
 ENV NODE_ENV=production
