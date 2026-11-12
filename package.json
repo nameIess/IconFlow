@@ -1,7 +1,7 @@
 {
   "name": "iconflow",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "IconFlow — client-side macOS icon search and ICNS to PNG/ICO converter.",
   "type": "module",
   "scripts": {
