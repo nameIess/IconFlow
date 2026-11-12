@@ -91,8 +91,8 @@ Before each release, update [`.github/release.md`](.github/release.md) on the br
 The release workflow is driven by a Git tag, not by local Docker history. After the release changes and `.github/release.md` are merged into `master`, push an annotated version tag, for example:
 
 ```bash
-git tag -a v3.0.3 -m "IconFlow v3.0.3"
-git push origin v3.0.3
+git tag -a v3.0.4 -m "IconFlow v3.0.4"
+git push origin v3.0.4
 ```
 
 That triggers validation, image builds, vulnerability scans, health checks and smoke tests. The workflow also requires the tag version to match `package.json`. Only after those gates pass does it publish one image to GHCR and create a GitHub Release using `.github/release.md` as its body. The downloadable `compose.yaml` asset pins both services to that exact release image tag; the source `docker/compose.yaml` keeps its `latest` default for general use. Stable tags also move the major, minor, and `latest` image aliases. Prerelease tags create GitHub prereleases and do not move stable Docker aliases. Existing release tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.

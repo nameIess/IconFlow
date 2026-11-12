@@ -1,19 +1,18 @@
-<!-- release-tag: v3.0.3 -->
+<!-- release-tag: v3.0.4 -->
 
 ## Summary
 
-IconFlow now publishes GitHub Releases alongside successful versioned Docker releases, with release notes prepared in the repository and linked from the app.
+IconFlow 3.0.4 publishes a Compose asset pinned to its Docker image version and improves import and retry behavior.
 
 ## Changes
 
-- Publish the versioned Docker image to GHCR and attach the Compose deployment file as a downloadable `compose.yaml` asset after the existing build, scan, and smoke-test workflow passes.
-- Validate that the release notes match the version tag and contain completed summary and change sections before building.
-- Mark prerelease tags as GitHub prereleases.
-- Add a Releases link to the app footer and document the release preparation and tagging steps.
+- Pin both services in the downloadable Compose asset to the exact release version, and require the Git tag to match `package.json`.
+- Show imported icons separately from search results, with accurate counts and no search pagination.
+- Keep only failed icons selected after a partial ZIP download so retrying does not download successful icons again.
 
 ## Deploy with Docker Compose
 
-Download `compose.yaml` from the release assets. It pins both containers to the `3.0.3` Docker image for this release. Pull and start them with:
+Download `compose.yaml` from the release assets. It pins both containers to the `3.0.4` Docker image for this release. Pull and start them with:
 
 PowerShell:
 
