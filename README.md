@@ -86,14 +86,16 @@ IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml pull
 IMAGE_TAG=1.0.0 docker compose -f docker/compose.yaml up --detach --wait
 ```
 
-The release workflow is driven by a Git tag, not by local Docker history. For the first release, push `v1.0.0` after the code is ready:
+Before each release, update [`.github/release.md`](.github/release.md) on the branch that will be merged into `master`. Set its release-tag marker to the exact Git tag, fill in the summary and change bullets, and remove all placeholders. The release workflow checks this file before building.
+
+The release workflow is driven by a Git tag, not by local Docker history. After the release changes and `.github/release.md` are merged into `master`, push an annotated version tag, for example:
 
 ```bash
-git tag -a v1.0.0 -m "IconFlow Docker release 1.0.0"
-git push origin v1.0.0
+git tag -a v3.0.3 -m "IconFlow v3.0.3"
+git push origin v3.0.3
 ```
 
-That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish one image to GHCR with `1.0.0` and `sha-<12-character-commit>` tags. For stable releases it also moves `1.0`, `1`, and `latest` to the new image. Prereleases such as `v1.1.0-rc.1` receive only their version and SHA tags, never `:latest`. Existing version tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
+That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish one image to GHCR and create a GitHub Release using `.github/release.md` as its body. Stable tags also move the major, minor, and `latest` image aliases. Prerelease tags create GitHub prereleases and do not move stable Docker aliases. Existing release tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
 
 For production rollouts, prefer `IMAGE_TAG=1.0.0` (or a digest) to keep deployments reproducible. The default `:latest` is a convenience pointer and can change when a new stable release passes all gates. See [scripts/README.md](scripts/README.md) for local tagging and troubleshooting.
 

@@ -1016,6 +1016,13 @@ function App() {
           macOSicons <ExternalLink size={12} />
         </a>
         <a
+          href="https://github.com/nameIess/IconFlow/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Releases <ExternalLink size={12} />
+        </a>
+        <a
           className="footer-github"
           href="https://github.com/nameIess/IconFlow"
           target="_blank"
