@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { validateReleaseNotes } from "./validate-release-notes.mjs";
 
-const releaseTemplate = readFileSync(new URL("../.github/release.md", import.meta.url), "utf8");
+const releaseTemplate = readFileSync(
+  new URL("../.github/release.md", import.meta.url),
+  "utf8",
+);
 
 function notesFor(tag) {
   return `<!-- release-tag: ${tag} -->
@@ -21,7 +24,10 @@ test("release notes accept a matching stable tag and completed sections", () => 
 });
 
 test("release notes accept a matching prerelease tag", () => {
-  assert.deepEqual(validateReleaseNotes("v3.1.0-rc.1", notesFor("v3.1.0-rc.1")), []);
+  assert.deepEqual(
+    validateReleaseNotes("v3.1.0-rc.1", notesFor("v3.1.0-rc.1")),
+    [],
+  );
 });
 
 test("release notes reject a marker that does not match the tag", () => {
@@ -30,7 +36,10 @@ test("release notes reject a marker that does not match the tag", () => {
 });
 
 test("release notes reject unresolved placeholders", () => {
-  const errors = validateReleaseNotes("v3.0.3", notesFor("v3.0.3").replace("Improves", "TODO: improves"));
+  const errors = validateReleaseNotes(
+    "v3.0.3",
+    notesFor("v3.0.3").replace("Improves", "TODO: improves"),
+  );
   assert.ok(errors.some((error) => error.includes("placeholders")));
 });
 
