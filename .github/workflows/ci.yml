@@ -15,12 +15,10 @@ on:
       - reopened
       - ready_for_review
 
-  # Run CI on the default branch as well as active implementation branches.
+  # Run CI after changes land on the default branch.
   push:
     branches:
       - master
-      - "feature/**"
-      - "fix/**"
 
   workflow_dispatch:
 
