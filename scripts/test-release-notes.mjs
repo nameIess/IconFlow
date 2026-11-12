@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { validateReleaseNotes } from "./validate-release-notes.mjs";
 
-const releaseTemplate = readFileSync(
+const checkedInReleaseNotes = readFileSync(
   new URL("../.github/release.md", import.meta.url),
   "utf8",
 );
@@ -59,8 +59,8 @@ test("release notes reject invalid version tags", () => {
   assert.ok(validateReleaseNotes("v03.0.3", notesFor("v03.0.3")).length > 0);
 });
 
-test("the checked-in template cannot be published without developer updates", () => {
-  const errors = validateReleaseNotes("v3.0.3", releaseTemplate);
-  assert.ok(errors.some((error) => error.includes("first line")));
-  assert.ok(errors.some((error) => error.includes("placeholders")));
+test("checked-in release notes validate against their tag marker", () => {
+  const tag = checkedInReleaseNotes.match(/^<!-- release-tag: (.+) -->$/m)?.[1];
+  assert.ok(tag, "release.md must include a release-tag marker");
+  assert.deepEqual(validateReleaseNotes(tag, checkedInReleaseNotes), []);
 });
