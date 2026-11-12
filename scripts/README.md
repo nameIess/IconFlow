@@ -7,6 +7,7 @@ Run the PowerShell release script from the repository root with an explicit vers
 The script accepts Docker-compatible SemVer versions (MAJOR.MINOR.PATCH with an optional prerelease such as 1.0.0-rc.1). An optional leading "v" is accepted. SemVer build metadata (+build) is not supported because Docker tags do not allow the plus sign.
 
 It creates local tags for one image:
+
 - `ghcr.io/nameiess/iconflow:1.0.0`
 - `ghcr.io/nameiess/iconflow:sha-<12-character-commit>`
 
@@ -34,6 +35,7 @@ The resolver API should reject an untrusted URL with HTTP 400:
     curl.exe -i --get --data-urlencode "url=https://example.com/" http://127.0.0.1:8080/api/resolve-icon
 
 Troubleshooting:
+
 - If Docker commands cannot connect, start Docker Desktop / Docker Engine.
 - If the port is occupied, stop the process using port 8080 before starting Compose.
 - If health checks fail, inspect Compose logs; the resolver must become healthy before the frontend starts.
