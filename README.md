@@ -95,7 +95,7 @@ git tag -a v3.0.3 -m "IconFlow v3.0.3"
 git push origin v3.0.3
 ```
 
-That triggers validation, image builds, vulnerability scans, health checks and smoke tests. Only after those gates pass does the workflow publish one image to GHCR and create a GitHub Release using `.github/release.md` as its body, with `docker/compose.yaml` attached as a downloadable `compose.yaml` asset. Stable tags also move the major, minor, and `latest` image aliases. Prerelease tags create GitHub prereleases and do not move stable Docker aliases. Existing release tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
+That triggers validation, image builds, vulnerability scans, health checks and smoke tests. The workflow also requires the tag version to match `package.json`. Only after those gates pass does it publish one image to GHCR and create a GitHub Release using `.github/release.md` as its body. The downloadable `compose.yaml` asset pins both services to that exact release image tag; the source `docker/compose.yaml` keeps its `latest` default for general use. Stable tags also move the major, minor, and `latest` image aliases. Prerelease tags create GitHub prereleases and do not move stable Docker aliases. Existing release tags are not overwritten. Registry package visibility must be set appropriately in GitHub Packages; the workflow does not silently change visibility.
 
 For production rollouts, prefer `IMAGE_TAG=1.0.0` (or a digest) to keep deployments reproducible. The default `:latest` is a convenience pointer and can change when a new stable release passes all gates. See [scripts/README.md](scripts/README.md) for local tagging and troubleshooting.
 
