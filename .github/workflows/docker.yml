@@ -204,13 +204,13 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            gh release create "$GITHUB_REF_NAME" \
+            gh release create "$GITHUB_REF_NAME" docker/compose.yaml \
               --title "IconFlow $GITHUB_REF_NAME" \
               --notes-file .github/release.md \
               --verify-tag \
               --prerelease
           else
-            gh release create "$GITHUB_REF_NAME" \
+            gh release create "$GITHUB_REF_NAME" docker/compose.yaml \
               --title "IconFlow $GITHUB_REF_NAME" \
               --notes-file .github/release.md \
               --verify-tag

@@ -6,7 +6,26 @@ IconFlow now publishes GitHub Releases alongside successful versioned Docker rel
 
 ## Changes
 
-- Create a GitHub Release from this file after the tagged Docker image passes the existing build, scan, and smoke-test workflow.
+- Publish the versioned Docker image to GHCR and attach the Compose deployment file as a downloadable `compose.yaml` asset after the existing build, scan, and smoke-test workflow passes.
 - Validate that the release notes match the version tag and contain completed summary and change sections before building.
 - Mark prerelease tags as GitHub prereleases.
 - Add a Releases link to the app footer and document the release preparation and tagging steps.
+
+## Deploy with Docker Compose
+
+Download `compose.yaml` from the release assets. Set `IMAGE_TAG` to `3.0.3`, then pull and start the two containers from the published image.
+
+PowerShell:
+
+```powershell
+$env:IMAGE_TAG = "3.0.3"
+docker compose -f .\compose.yaml pull
+docker compose -f .\compose.yaml up --detach --wait
+```
+
+Linux or macOS:
+
+```sh
+IMAGE_TAG=3.0.3 docker compose -f compose.yaml pull
+IMAGE_TAG=3.0.3 docker compose -f compose.yaml up --detach --wait
+```
