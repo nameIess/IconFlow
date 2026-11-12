@@ -15,11 +15,11 @@ on:
       - reopened
       - ready_for_review
 
-  # Docker build + smoke tests are expensive. Run on feature/fix pushes and
-  # release tags; feat/** is reserved for miscellaneous work. PRs to master
-  # still get the Docker checks before merge.
+  # Build and smoke-test the default branch, implementation branches, and
+  # version tags. Only version tags publish images to GHCR.
   push:
     branches:
+      - master
       - 'feature/**'
       - 'fix/**'
     tags:
