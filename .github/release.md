@@ -13,12 +13,11 @@ IconFlow now publishes GitHub Releases alongside successful versioned Docker rel
 
 ## Deploy with Docker Compose
 
-Download `compose.yaml` from the release assets. Set `IMAGE_TAG` to `3.0.3`, then pull and start the two containers from the published image.
+Download `compose.yaml` from the release assets. It pins both containers to the `3.0.3` Docker image for this release. Pull and start them with:
 
 PowerShell:
 
 ```powershell
-$env:IMAGE_TAG = "3.0.3"
 docker compose -f .\compose.yaml pull
 docker compose -f .\compose.yaml up --detach --wait
 ```
@@ -26,6 +25,6 @@ docker compose -f .\compose.yaml up --detach --wait
 Linux or macOS:
 
 ```sh
-IMAGE_TAG=3.0.3 docker compose -f compose.yaml pull
-IMAGE_TAG=3.0.3 docker compose -f compose.yaml up --detach --wait
+docker compose -f compose.yaml pull
+docker compose -f compose.yaml up --detach --wait
 ```

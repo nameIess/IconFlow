@@ -70,6 +70,10 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: node scripts/validate-release-notes.mjs "$GITHUB_REF_NAME" .github/release.md
 
+      - name: Prepare version-pinned release Compose asset
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/create-release-compose.mjs "$GITHUB_REF_NAME" docker/compose.yaml "$RUNNER_TEMP/compose.yaml"
+
       - name: Validate Compose configuration
         run: docker compose -f docker/compose.yaml config --quiet
 
@@ -213,14 +217,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          compose_asset="$RUNNER_TEMP/compose.yaml"
+          node scripts/create-release-compose.mjs "$GITHUB_REF_NAME" docker/compose.yaml "$compose_asset"
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then
-            gh release create "$GITHUB_REF_NAME" docker/compose.yaml \
+            gh release create "$GITHUB_REF_NAME" "$compose_asset" \
               --title "IconFlow $GITHUB_REF_NAME" \
               --notes-file .github/release.md \
               --verify-tag \
               --prerelease
           else
-            gh release create "$GITHUB_REF_NAME" docker/compose.yaml \
+            gh release create "$GITHUB_REF_NAME" "$compose_asset" \
               --title "IconFlow $GITHUB_REF_NAME" \
               --notes-file .github/release.md \
               --verify-tag

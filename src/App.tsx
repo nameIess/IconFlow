@@ -35,6 +35,11 @@ import {
   previewUrl,
   zipFiles,
 } from "./converter";
+import {
+  mergeImportedHits,
+  mergeUniqueHits,
+  retrySelection,
+} from "./result-state";
 import packageJson from "../package.json";
 
 type Format = "png" | "ico";
@@ -90,24 +95,6 @@ function hitId(hit: IconHit, index = 0): string {
   return hit.objectID || hit.icnsUrl || `${hit.appName}-${index}`;
 }
 
-function mergeUniqueHits(current: IconHit[], next: IconHit[]): IconHit[] {
-  const seen = new Set<string>();
-  const merged: IconHit[] = [];
-  for (const hit of [...current, ...next]) {
-    const keys = [
-      hit.objectID ? `id:${hit.objectID.toLowerCase()}` : "",
-      hit.icnsUrl ? `icns:${hit.icnsUrl.toLowerCase()}` : "",
-      hit.lowResPngUrl ? `preview:${hit.lowResPngUrl.toLowerCase()}` : "",
-    ].filter(Boolean);
-    if (keys.some((key) => seen.has(key))) continue;
-    if (!keys.length)
-      keys.push(`name:${hit.appName.toLowerCase()}:${merged.length}`);
-    keys.forEach((key) => seen.add(key));
-    merged.push(hit);
-  }
-  return merged;
-}
-
 function App() {
   const [primaryApiKey, setPrimaryApiKey] = useState(() =>
     storedWithLegacy(PRIMARY_KEY, LEGACY_SEARCH_KEY),
@@ -158,6 +145,7 @@ function App() {
   const importModalFileRef = useRef<HTMLInputElement>(null);
   const requestGeneration = useRef(0);
   const previewGeneration = useRef(0);
+  const importedView = useRef(false);
   const dialogReturnFocusRef = useRef<HTMLElement | null>(null);
   const activeDialogKind = preview
     ? "preview"
@@ -166,6 +154,7 @@ function App() {
       : settingsOpen
         ? "settings"
         : null;
+  const visibleTotal = importedView.current ? results.length : total;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -267,6 +256,7 @@ function App() {
     data: Awaited<ReturnType<typeof searchIcons>>,
     searchValue: string,
   ) {
+    importedView.current = false;
     setResults(data.hits);
     setTotal(data.totalHits);
     setPage(data.page);
@@ -308,16 +298,19 @@ function App() {
     try {
       const data = await importIconUrls(urls);
       if (data.hits.length) {
+        const appendToImportedView = importedView.current;
         setResults((current) => {
-          const merged = mergeUniqueHits(current, data.hits);
-          if (!activeQuery) setTotal(merged.length);
+          const merged = mergeImportedHits(
+            current,
+            data.hits,
+            appendToImportedView,
+          );
           return merged;
         });
-        if (!activeQuery) {
-          setActiveQuery("Imported icons");
-          setPage(1);
-          setTotalPages(1);
-        }
+        importedView.current = true;
+        setActiveQuery("Imported icons");
+        setPage(1);
+        setTotalPages(1);
         setSelectedIds(new Set());
         setImportOpen(false);
         const failedText = data.failed.length
@@ -626,9 +619,9 @@ function App() {
   }
 
   async function downloadSelected() {
-    const selected = results.filter((hit, index) =>
-      selectedIds.has(hitId(hit, index)),
-    );
+    const selected = results
+      .map((hit, index) => ({ hit, id: hitId(hit, index) }))
+      .filter(({ id }) => selectedIds.has(id));
     if (!selected.length) return setToast("Select at least one icon first.");
 
     setBulkDownloading(true);
@@ -638,9 +631,10 @@ function App() {
       const files: { name: string; blob: Blob }[] = [];
       const usedNames = new Set<string>();
       const failedNames: string[] = [];
+      const failedIds = new Set<string>();
 
       for (let index = 0; index < selected.length; index += 1) {
-        const hit = selected[index];
+        const { hit, id } = selected[index];
         const format = defaultFormat;
         try {
           const sourceUrl = hit.icnsUrl || hit.lowResPngUrl;
@@ -664,6 +658,7 @@ function App() {
           });
         } catch {
           failedNames.push(hit.appName);
+          failedIds.add(id);
         }
         setBulkProgress(index + 1);
       }
@@ -680,7 +675,7 @@ function App() {
         archive,
         `iconflow-icons-${new Date().toISOString().slice(0, 10)}.zip`,
       );
-      if (!failedNames.length) setSelectedIds(new Set());
+      setSelectedIds(retrySelection(selected, failedIds));
       setToast(
         failedNames.length
           ? `Downloaded ${files.length} icon(s). Failed: ${failedNames.join(", ")}. Failed selections were kept for retry.`
@@ -711,6 +706,7 @@ function App() {
             setPageLoading(false);
             setQuery("");
             setActiveQuery("");
+            importedView.current = false;
             setResults([]);
             setTotal(0);
             setPage(1);
@@ -875,7 +871,7 @@ function App() {
             </div>
             {results.length > 0 && (
               <span className="result-count">
-                {results.length.toLocaleString()} of {total.toLocaleString()}{" "}
+                {results.length.toLocaleString()} of {visibleTotal.toLocaleString()}{" "}
                 loaded
               </span>
             )}
@@ -971,11 +967,11 @@ function App() {
                     )}
                     {pageLoading
                       ? "Loading…"
-                      : `Load more icons (${Math.min(SEARCH_PAGE_SIZE, Math.max(0, total - results.length))})`}
+                      : `Load more icons (${Math.min(SEARCH_PAGE_SIZE, Math.max(0, visibleTotal - results.length))})`}
                   </button>
                   <span className="pagination-status">
                     Loaded {results.length.toLocaleString()} of{" "}
-                    {total.toLocaleString()}
+                    {visibleTotal.toLocaleString()}
                   </span>
                 </div>
               )}
