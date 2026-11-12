@@ -1,15 +1,26 @@
-export const MACOSICONS_HOSTS = new Set(["macosicons.com", "www.macosicons.com"]);
+export const MACOSICONS_HOSTS = new Set([
+  "macosicons.com",
+  "www.macosicons.com",
+]);
 
 export function parseImportUrl(value: string): URL | null {
   try {
     const url = new URL(value.trim());
-    return url.protocol === "https:" && !url.username && !url.password && !url.port ? url : null;
+    return url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      !url.port
+      ? url
+      : null;
   } catch {
     return null;
   }
 }
 
-export function parseIconImportText(text: string): { urls: string[]; invalidCount: number } {
+export function parseIconImportText(text: string): {
+  urls: string[];
+  invalidCount: number;
+} {
   const seen = new Set<string>();
   const urls: string[] = [];
   let invalidCount = 0;
@@ -27,8 +38,10 @@ export function parseIconImportText(text: string): { urls: string[]; invalidCoun
       if (!url) continue;
 
       const host = url.hostname.toLowerCase();
-      const supported = MACOSICONS_HOSTS.has(host) ||
-        (host === "s3-new.macosicons.com" && /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
+      const supported =
+        MACOSICONS_HOSTS.has(host) ||
+        (host === "s3-new.macosicons.com" &&
+          /\.(?:icns|png|jpe?g|webp)(?:$|[?#])/i.test(url.pathname));
 
       if (!supported) continue;
 

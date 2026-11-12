@@ -28,4 +28,3 @@
 ### Preview or verification
 
 <!-- Mention how you reviewed the rendered Markdown, or add screenshots for visual changes. -->
-

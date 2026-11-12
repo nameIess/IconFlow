@@ -44,7 +44,9 @@ export function createResolverServer() {
         return;
       }
 
-      const result = await resolveMacosiconsShareUrl(requestUrl.searchParams.get("url") || "");
+      const result = await resolveMacosiconsShareUrl(
+        requestUrl.searchParams.get("url") || "",
+      );
       sendJson(res, result.status, result.body);
     } catch {
       if (!res.headersSent) {
@@ -62,7 +64,10 @@ export function createResolverServer() {
   return server;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   const server = createResolverServer();
   server.listen(3000, "0.0.0.0", () => {
     process.stdout.write("IconFlow resolver listening on port 3000\n");

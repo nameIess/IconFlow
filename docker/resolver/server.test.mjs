@@ -15,7 +15,10 @@ before(async () => {
 });
 
 after(async () => {
-  if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  if (server)
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
 });
 
 test("health endpoint responds successfully without a body", async () => {
@@ -31,17 +34,26 @@ test("unknown routes return 404", async () => {
 });
 
 test("resolver rejects non-GET methods", async () => {
-  const response = await fetch(`${origin}/api/resolve-icon?url=https%3A%2F%2Fmacosicons.com%2Fshare%2Fexample`, { method: "POST" });
+  const response = await fetch(
+    `${origin}/api/resolve-icon?url=https%3A%2F%2Fmacosicons.com%2Fshare%2Fexample`,
+    { method: "POST" },
+  );
   assert.equal(response.status, 405);
 });
 
 test("resolver rejects URLs outside the allow-list without fetching them", async () => {
-  const response = await fetch(`${origin}/api/resolve-icon?url=${encodeURIComponent("https://example.com/")}`);
+  const response = await fetch(
+    `${origin}/api/resolve-icon?url=${encodeURIComponent("https://example.com/")}`,
+  );
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: "Only macOSicons HTTPS share URLs are supported." });
+  assert.deepEqual(await response.json(), {
+    error: "Only macOSicons HTTPS share URLs are supported.",
+  });
 });
 
 test("oversized request targets are rejected", async () => {
-  const response = await fetch(`${origin}/api/resolve-icon?url=${"a".repeat(5000)}`);
+  const response = await fetch(
+    `${origin}/api/resolve-icon?url=${"a".repeat(5000)}`,
+  );
   assert.equal(response.status, 414);
 });

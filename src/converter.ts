@@ -7,14 +7,26 @@ const MAX_SOURCE_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_SOURCE_IMAGE_DIMENSION = 4096;
 
 function isPng(bytes: Uint8Array, offset: number): boolean {
-  return offset >= 0 && offset + PNG.length <= bytes.length &&
-    PNG.every((value, index) => bytes[offset + index] === value);
+  return (
+    offset >= 0 &&
+    offset + PNG.length <= bytes.length &&
+    PNG.every((value, index) => bytes[offset + index] === value)
+  );
 }
 
 function typeSize(type: string): number {
   const sizes: Record<string, number> = {
-    icp4: 16, icp5: 32, icp6: 64, ic07: 128, ic08: 256,
-    ic09: 512, ic10: 1024, ic11: 32, ic12: 64, ic13: 256, ic14: 512,
+    icp4: 16,
+    icp5: 32,
+    icp6: 64,
+    ic07: 128,
+    ic08: 256,
+    ic09: 512,
+    ic10: 1024,
+    ic11: 32,
+    ic12: 64,
+    ic13: 256,
+    ic14: 512,
   };
   return sizes[type] || 0;
 }
@@ -34,14 +46,21 @@ function blobBytes(bytes: Uint8Array): ArrayBuffer {
 
 function pngDimensions(png: Uint8Array): { width: number; height: number } {
   if (png.length < 24 || !isPng(png, 0)) {
-    throw new Error("The extracted ICNS data does not contain a valid PNG header.");
+    throw new Error(
+      "The extracted ICNS data does not contain a valid PNG header.",
+    );
   }
 
   const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
   const width = view.getUint32(16);
   const height = view.getUint32(20);
 
-  if (!width || !height || width > MAX_RENDER_SIZE || height > MAX_RENDER_SIZE) {
+  if (
+    !width ||
+    !height ||
+    width > MAX_RENDER_SIZE ||
+    height > MAX_RENDER_SIZE
+  ) {
     throw new Error("The icon dimensions are unsupported or unsafe to render.");
   }
 
@@ -50,14 +69,21 @@ function pngDimensions(png: Uint8Array): { width: number; height: number } {
 
 function validateIcns(buffer: ArrayBuffer): void {
   if (buffer.byteLength < ICNS_HEADER_SIZE) {
-    throw new Error("The downloaded file is too small to be a valid ICNS file.");
+    throw new Error(
+      "The downloaded file is too small to be a valid ICNS file.",
+    );
   }
   if (buffer.byteLength > MAX_ICNS_BYTES) {
     throw new Error("The ICNS file is too large to process safely.");
   }
 
   const bytes = new Uint8Array(buffer);
-  if (bytes[0] !== 105 || bytes[1] !== 99 || bytes[2] !== 110 || bytes[3] !== 115) {
+  if (
+    bytes[0] !== 105 ||
+    bytes[1] !== 99 ||
+    bytes[2] !== 110 ||
+    bytes[3] !== 115
+  ) {
     throw new Error("The downloaded file is not a valid ICNS file.");
   }
 
@@ -109,14 +135,18 @@ export function extractBestPng(buffer: ArrayBuffer): Uint8Array {
 
   candidates.sort((a, b) => b.size - a.size || b.data.length - a.data.length);
   if (!candidates.length) {
-    throw new Error("This ICNS uses a representation not supported by the browser converter yet.");
+    throw new Error(
+      "This ICNS uses a representation not supported by the browser converter yet.",
+    );
   }
 
   return candidates[0].data;
 }
 
 async function imageFromPng(png: Uint8Array): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(new Blob([blobBytes(png)], { type: "image/png" }));
+  const url = URL.createObjectURL(
+    new Blob([blobBytes(png)], { type: "image/png" }),
+  );
   try {
     const image = new Image();
     image.src = url;
@@ -127,7 +157,10 @@ async function imageFromPng(png: Uint8Array): Promise<HTMLImageElement> {
   }
 }
 
-async function renderPng(source: Uint8Array, size: number): Promise<Uint8Array> {
+async function renderPng(
+  source: Uint8Array,
+  size: number,
+): Promise<Uint8Array> {
   if (!Number.isInteger(size) || size < 1 || size > MAX_RENDER_SIZE) {
     throw new Error("The requested icon size is invalid.");
   }
@@ -145,7 +178,9 @@ async function renderPng(source: Uint8Array, size: number): Promise<Uint8Array> 
   context.imageSmoothingQuality = "high";
   context.drawImage(image, 0, 0, size, size);
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
+  );
   if (!blob) throw new Error("PNG encoding failed.");
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -154,20 +189,34 @@ export async function icnsToPng(buffer: ArrayBuffer): Promise<Blob> {
   const source = extractBestPng(buffer);
   const { width, height } = pngDimensions(source);
   const size = Math.max(width, height);
-  return new Blob([blobBytes(await renderPng(source, size))], { type: "image/png" });
+  return new Blob([blobBytes(await renderPng(source, size))], {
+    type: "image/png",
+  });
 }
 
-export async function imageToPng(buffer: ArrayBuffer, mimeType = "image/png"): Promise<Blob> {
-  if (buffer.byteLength < 16) throw new Error("The source image is empty or invalid.");
-  if (buffer.byteLength > MAX_SOURCE_IMAGE_BYTES) throw new Error("The source image is too large to process safely.");
+export async function imageToPng(
+  buffer: ArrayBuffer,
+  mimeType = "image/png",
+): Promise<Blob> {
+  if (buffer.byteLength < 16)
+    throw new Error("The source image is empty or invalid.");
+  if (buffer.byteLength > MAX_SOURCE_IMAGE_BYTES)
+    throw new Error("The source image is too large to process safely.");
 
   const imageUrl = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
   try {
     const image = new Image();
     image.src = imageUrl;
     await image.decode();
-    if (!image.naturalWidth || !image.naturalHeight || image.naturalWidth > MAX_SOURCE_IMAGE_DIMENSION || image.naturalHeight > MAX_SOURCE_IMAGE_DIMENSION) {
-      throw new Error("The source image dimensions are unsupported or unsafe to render.");
+    if (
+      !image.naturalWidth ||
+      !image.naturalHeight ||
+      image.naturalWidth > MAX_SOURCE_IMAGE_DIMENSION ||
+      image.naturalHeight > MAX_SOURCE_IMAGE_DIMENSION
+    ) {
+      throw new Error(
+        "The source image dimensions are unsupported or unsafe to render.",
+      );
     }
 
     const canvas = document.createElement("canvas");
@@ -176,7 +225,9 @@ export async function imageToPng(buffer: ArrayBuffer, mimeType = "image/png"): P
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas is unavailable.");
     context.drawImage(image, 0, 0);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
     if (!blob) throw new Error("PNG encoding failed.");
     return blob;
   } finally {
@@ -184,37 +235,54 @@ export async function imageToPng(buffer: ArrayBuffer, mimeType = "image/png"): P
   }
 }
 
-export async function imageToIco(buffer: ArrayBuffer, mimeType = "image/png"): Promise<Blob> {
-  if (buffer.byteLength < 16) throw new Error("The source image is empty or invalid.");
-  if (buffer.byteLength > MAX_SOURCE_IMAGE_BYTES) throw new Error("The source image is too large to process safely.");
+export async function imageToIco(
+  buffer: ArrayBuffer,
+  mimeType = "image/png",
+): Promise<Blob> {
+  if (buffer.byteLength < 16)
+    throw new Error("The source image is empty or invalid.");
+  if (buffer.byteLength > MAX_SOURCE_IMAGE_BYTES)
+    throw new Error("The source image is too large to process safely.");
 
   const imageUrl = URL.createObjectURL(new Blob([buffer], { type: mimeType }));
   try {
     const image = new Image();
     image.src = imageUrl;
     await image.decode();
-    if (!image.naturalWidth || !image.naturalHeight || image.naturalWidth > MAX_SOURCE_IMAGE_DIMENSION || image.naturalHeight > MAX_SOURCE_IMAGE_DIMENSION) {
-      throw new Error("The source image dimensions are unsupported or unsafe to render.");
+    if (
+      !image.naturalWidth ||
+      !image.naturalHeight ||
+      image.naturalWidth > MAX_SOURCE_IMAGE_DIMENSION ||
+      image.naturalHeight > MAX_SOURCE_IMAGE_DIMENSION
+    ) {
+      throw new Error(
+        "The source image dimensions are unsupported or unsafe to render.",
+      );
     }
 
     const sizes = [16, 24, 32, 48, 64, 128, 256];
-    const images = await Promise.all(sizes.map(async (size) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = size;
-      canvas.height = size;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas is unavailable.");
-      context.clearRect(0, 0, size, size);
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = "high";
-      context.drawImage(image, 0, 0, size, size);
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("PNG encoding failed.");
-      return new Uint8Array(await blob.arrayBuffer());
-    }));
+    const images = await Promise.all(
+      sizes.map(async (size) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Canvas is unavailable.");
+        context.clearRect(0, 0, size, size);
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.drawImage(image, 0, 0, size, size);
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/png"),
+        );
+        if (!blob) throw new Error("PNG encoding failed.");
+        return new Uint8Array(await blob.arrayBuffer());
+      }),
+    );
 
     const imageStart = 6 + sizes.length * 16;
-    const total = imageStart + images.reduce((sum, item) => sum + item.length, 0);
+    const total =
+      imageStart + images.reduce((sum, item) => sum + item.length, 0);
     const output = new ArrayBuffer(total);
     const view = new DataView(output);
     const bytes = new Uint8Array(output);
@@ -248,7 +316,9 @@ export async function imageToIco(buffer: ArrayBuffer, mimeType = "image/png"): P
 export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
   const source = extractBestPng(buffer);
   const sizes = [16, 24, 32, 48, 64, 128, 256];
-  const images = await Promise.all(sizes.map((size) => renderPng(source, size)));
+  const images = await Promise.all(
+    sizes.map((size) => renderPng(source, size)),
+  );
   const imageStart = 6 + sizes.length * 16;
   const total = imageStart + images.reduce((sum, item) => sum + item.length, 0);
 
@@ -287,7 +357,9 @@ export async function icnsToIco(buffer: ArrayBuffer): Promise<Blob> {
 
 export function previewUrl(buffer: ArrayBuffer): Promise<string> {
   return Promise.resolve(
-    URL.createObjectURL(new Blob([blobBytes(extractBestPng(buffer))], { type: "image/png" })),
+    URL.createObjectURL(
+      new Blob([blobBytes(extractBestPng(buffer))], { type: "image/png" }),
+    ),
   );
 }
 
@@ -304,7 +376,8 @@ export function download(blob: Blob, name: string): void {
 }
 
 export function filename(name: string, extension: string): string {
-  const safeExtension = extension === "png" || extension === "ico" ? extension : "png";
+  const safeExtension =
+    extension === "png" || extension === "ico" ? extension : "png";
   const sanitized = name
     .replace(/[\\/<>:"|?*\u0000-\u001f]/g, " ")
     .replace(/\s+/g, " ")
@@ -313,7 +386,9 @@ export function filename(name: string, extension: string): string {
     .slice(0, 120);
 
   const base = sanitized || "icon";
-  const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(base) ? `_${base}` : base;
+  const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i.test(base)
+    ? `_${base}`
+    : base;
   return `${reserved}.${safeExtension}`;
 }
 
@@ -349,7 +424,8 @@ function zipU32(view: DataView, offset: number, value: number): void {
  */
 export async function zipFiles(files: ZipFile[]): Promise<Blob> {
   if (!files.length) throw new Error("No files were selected.");
-  if (files.length > 0xffff) throw new Error("Too many files were selected for a ZIP archive.");
+  if (files.length > 0xffff)
+    throw new Error("Too many files were selected for a ZIP archive.");
 
   const entries: {
     name: Uint8Array;
@@ -373,18 +449,28 @@ export async function zipFiles(files: ZipFile[]): Promise<Blob> {
     }
 
     const localSize = 30 + name.length + data.length;
-    if (!Number.isSafeInteger(offset + localSize) || offset + localSize > MAX_ZIP_BYTES) {
-      throw new Error("The ZIP archive would be too large to create safely in the browser.");
+    if (
+      !Number.isSafeInteger(offset + localSize) ||
+      offset + localSize > MAX_ZIP_BYTES
+    ) {
+      throw new Error(
+        "The ZIP archive would be too large to create safely in the browser.",
+      );
     }
 
     entries.push({ name, data, crc: crc32(data), offset });
     offset += localSize;
   }
 
-  const centralSize = entries.reduce((sum, entry) => sum + 46 + entry.name.length, 0);
+  const centralSize = entries.reduce(
+    (sum, entry) => sum + 46 + entry.name.length,
+    0,
+  );
   const totalSize = offset + centralSize + 22;
   if (!Number.isSafeInteger(totalSize) || totalSize > MAX_ZIP_BYTES) {
-    throw new Error("The ZIP archive would be too large to create safely in the browser.");
+    throw new Error(
+      "The ZIP archive would be too large to create safely in the browser.",
+    );
   }
 
   const output = new Uint8Array(totalSize);

@@ -19,8 +19,8 @@ on:
   push:
     branches:
       - master
-      - 'feature/**'
-      - 'fix/**'
+      - "feature/**"
+      - "fix/**"
 
   workflow_dispatch:
 

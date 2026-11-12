@@ -42,7 +42,7 @@ flowchart TB
 - **health checks** let Compose determine when each service is ready. The web service waits for the resolver health check before starting.
 - **one image, two roles** keeps the release artifact consistent while each container runs only its intended process.
 
-The intended local URL is **http://127.0.0.1:8080**. The Compose project is named `iconflow`, so containers normally appear as `iconflow-web-1` and `iconflow-resolver-1`.
+The intended local URL is **http://127.0.0.1:8080**. Compose uses the explicit container names `iconflow-web` and `iconflow-resolver` for stable references.
 
 ## Prerequisites
 
@@ -202,21 +202,21 @@ ghcr.io/nameiess/iconflow:latest
 
 GHCR image paths must be lowercase. The Git release tag may begin with `v`, but the Docker image tag does not: Git tag `v1.0.0` produces Docker tag `1.0.0`.
 
-| Tag pattern | Intended use | Guidance |
-| --- | --- | --- |
-| `1.0.0` | Versioned release | Recommended for deployments and rollback |
-| `1.0` | Minor-version alias | Moves as compatible patch releases are published |
-| `1` | Major-version alias | Moves as compatible releases are published |
-| `sha-<commit>` | Exact source revision | Useful for traceability |
-| `latest` | Convenience alias | Mutable; do not use as a rollback reference |
-| `ci` | Temporary CI build | Not intended as a production pin |
+| Tag pattern    | Intended use          | Guidance                                         |
+| -------------- | --------------------- | ------------------------------------------------ |
+| `1.0.0`        | Versioned release     | Recommended for deployments and rollback         |
+| `1.0`          | Minor-version alias   | Moves as compatible patch releases are published |
+| `1`            | Major-version alias   | Moves as compatible releases are published       |
+| `sha-<commit>` | Exact source revision | Useful for traceability                          |
+| `latest`       | Convenience alias     | Mutable; do not use as a rollback reference      |
+| `ci`           | Temporary CI build    | Not intended as a production pin                 |
 
 ### Ports and service exposure
 
-| Service | Container port | Host exposure |
-| --- | ---: | --- |
-| `web` | `8080` | `127.0.0.1:8080` |
-| `resolver` | `3000` | Not published; internal Docker network only |
+| Service    | Container port | Host exposure                               |
+| ---------- | -------------: | ------------------------------------------- |
+| `web`      |         `8080` | `127.0.0.1:8080`                            |
+| `resolver` |         `3000` | Not published; internal Docker network only |
 
 The host binding is intentionally limited to loopback. It makes the app available on the local machine without exposing port 8080 on every network interface.
 
@@ -224,11 +224,11 @@ The host binding is intentionally limited to loopback. It makes the app availabl
 
 The Compose file currently sets resource limits and process limits for each service:
 
-| Setting | web | resolver |
-| --- | ---: | ---: |
-| Memory limit | 128 MB | 128 MB |
-| CPU limit | 1 CPU | 0.5 CPU |
-| PID limit | 100 | 64 |
+| Setting               |        web |   resolver |
+| --------------------- | ---------: | ---------: |
+| Memory limit          |     128 MB |     128 MB |
+| CPU limit             |      1 CPU |    0.5 CPU |
+| PID limit             |        100 |         64 |
 | Health-check interval | 30 seconds | 30 seconds |
 
 These values are defined in `docker/compose.yaml`; edit that file if the deployment needs different limits, then validate the configuration before restarting.
@@ -455,17 +455,17 @@ IconFlow's current stack is intended to be stateless, but use the volume-removal
 
 ## Troubleshooting
 
-| Symptom | Likely cause | What to check |
-| --- | --- | --- |
-| Docker commands cannot connect to the daemon | Docker Desktop is stopped or still starting | Start Docker Desktop and retry `docker info` |
-| Compose configuration fails | YAML syntax or Compose version issue | Run `docker compose -f docker/compose.yaml config` and read the first reported error |
-| Image pull returns unauthorized | Private GHCR package or missing credentials | Run `docker login ghcr.io` with a token that has `read:packages` |
-| Container exits immediately | Invalid command, missing file, or runtime error | Run `docker compose -f docker/compose.yaml logs --no-color` |
-| Web container is unhealthy | Nginx failed to start or port 8080 is unavailable inside the container | Inspect web logs and `docker compose -f docker/compose.yaml ps` |
-| Port 8080 is already allocated | Another process or container is using the host port | Stop the conflicting process or change the host-side port mapping in Compose |
-| Web cannot reach resolver | Resolver is unhealthy or services are not on the same network | Check both service states and resolver logs; confirm the internal resolver service name |
-| Browser cannot open the site | Stack is stopped, port mapping differs, or request uses the wrong address | Check `docker compose ps` and open `http://127.0.0.1:8080` |
-| Disk usage keeps growing | Old images, build cache, or logs are accumulating | Inspect `docker system df`; prune only resources you no longer need |
+| Symptom                                      | Likely cause                                                              | What to check                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Docker commands cannot connect to the daemon | Docker Desktop is stopped or still starting                               | Start Docker Desktop and retry `docker info`                                            |
+| Compose configuration fails                  | YAML syntax or Compose version issue                                      | Run `docker compose -f docker/compose.yaml config` and read the first reported error    |
+| Image pull returns unauthorized              | Private GHCR package or missing credentials                               | Run `docker login ghcr.io` with a token that has `read:packages`                        |
+| Container exits immediately                  | Invalid command, missing file, or runtime error                           | Run `docker compose -f docker/compose.yaml logs --no-color`                             |
+| Web container is unhealthy                   | Nginx failed to start or port 8080 is unavailable inside the container    | Inspect web logs and `docker compose -f docker/compose.yaml ps`                         |
+| Port 8080 is already allocated               | Another process or container is using the host port                       | Stop the conflicting process or change the host-side port mapping in Compose            |
+| Web cannot reach resolver                    | Resolver is unhealthy or services are not on the same network             | Check both service states and resolver logs; confirm the internal resolver service name |
+| Browser cannot open the site                 | Stack is stopped, port mapping differs, or request uses the wrong address | Check `docker compose ps` and open `http://127.0.0.1:8080`                              |
+| Disk usage keeps growing                     | Old images, build cache, or logs are accumulating                         | Inspect `docker system df`; prune only resources you no longer need                     |
 
 Useful diagnostic commands:
 
@@ -511,11 +511,11 @@ git diff -- docker/manual.md
 
 ## Related files
 
-| Path | Purpose |
-| --- | --- |
-| `docker/Dockerfile` | Builds the frontend and packages the runtime image |
-| `docker/compose.yaml` | Defines services, networking, health checks, ports, and security settings |
-| `docker/resolver/server.mjs` | Resolver service entry point |
-| `docker/nginx/nginx.conf` | Nginx server configuration |
-| `docker/nginx/security-headers.conf` | HTTP security headers |
-| `.github/workflows/docker.yml` | Automated build, checks, and image publishing |
+| Path                                 | Purpose                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `docker/Dockerfile`                  | Builds the frontend and packages the runtime image                        |
+| `docker/compose.yaml`                | Defines services, networking, health checks, ports, and security settings |
+| `docker/resolver/server.mjs`         | Resolver service entry point                                              |
+| `docker/nginx/nginx.conf`            | Nginx server configuration                                                |
+| `docker/nginx/security-headers.conf` | HTTP security headers                                                     |
+| `.github/workflows/docker.yml`       | Automated build, checks, and image publishing                             |
